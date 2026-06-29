@@ -1,0 +1,2490 @@
+╭─── Claude Code v2.1.195 ─────────────────────────────────────────────────────╮
+│                                      │ Tips for getting started              │
+│         Welcome back Abdulla!        │ Run /init to create a CLAUDE.md file… │
+│                                      │ ───────────────────────────────────── │
+│                ▐▛███▜▌               │ What's new                            │
+│               ▝▜█████▛▘              │ Added `CLAUDE_CODE_DISABLE_MOUSE_CLI… │
+│                 ▘▘ ▝▝                │ Fixed hook matchers with hyphenated … │
+│                                      │ Fixed voice dictation on macOS captu… │
+│   Opus 4.8 · Claude Team · Devista   │ /release-notes for more               │
+│   D:\GitHub\inventory\Apps\Backend   │                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+❯ /effort                                                                       
+  ⎿  Set effort level to ultracode (this session only): xhigh + dynamic workflow
+     orchestration
+
+❯ /effort                                                                       
+  ⎿  Set effort level to high (saved as your default for new sessions):
+     Comprehensive implementation with extensive testing and documentation
+
+❯ /effort                                                                       
+  ⎿  Set effort level to ultracode (this session only): xhigh + dynamic workflow
+     orchestration
+
+❯ d:\GitHub\inventory\Apps i want u to build simple MVP for retails apps using  
+  Laravel and React Laravel should follow layered Microservices (Service -      
+  Business Logic - Dto - Models - Mappers ) and integrate it with React using   
+  Rest Apis                                                                     
+
+● I'll start by understanding the environment and what's already in the working
+  directory before building.
+
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+● Good — full toolchain is present (PHP 8.4, Composer 2.8, Node 22, Laravel
+  installer 4.2). There are already Backend and Frontend folders. Let me check
+  if they have anything in them.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Environment is fully ready: PHP 8.4, Composer, Node 22, Laravel installer, and
+  MySQL/MariaDB (XAMPP) plus SQLite. Both Backend and Frontend folders are
+  empty, so this is a clean build.
+
+  Before I scaffold, let me lock down scope — these choices materially change
+  what I build.
+
+● User answered Claude's questions:
+  ⎿  · Which modules should the retail/inventory MVP include? → Core inventory
+     · Authentication approach for the API? → Sanctum token auth
+     · Which database should the backend use? → MySQL / MariaDB
+
+● Scope locked:
+  - Modules: Categories + Products + Stock adjustments + Dashboard
+  - Auth: Sanctum bearer tokens (register/login/logout/me)
+  - DB: MySQL/MariaDB (XAMPP)
+
+  Here's the architecture I'll build — a clean layered Laravel backend with the
+  exact layers you named, consumed by a React SPA:
+
+  React (Vite + TS + Tailwind)  ──REST/JSON──>  Laravel API
+                                                    │
+     Controller (thin, HTTP only)                   │  app/Http/Controllers/Api
+          │ FormRequest validation → input DTO      │
+          ▼                                          │
+     Service  (interface / contract)                 │  app/Services/Contracts
+          ▼                                          │
+     Business Logic (service impl, rules, TX)        │  app/Services
+          ▼              ▲                            │
+     Models (Eloquent)   │ Mappers (Model⇄DTO)       │  app/Models, app/Mappers
+          ▼              │                            │
+     DTOs (typed transfer objects out)               │  app/DTOs
+
+  Let me kick off the Laravel scaffold (slow) and verify the database server is
+  running in parallel.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Two things: the Laravel skeleton was created (it auto-ran migrations against
+  SQLite by default — I'll switch it to MySQL). But MariaDB is not running
+  (connection refused on 3306). Let me start the XAMPP MariaDB server and set up
+  task tracking.
+
+  Ran 2 shell commands (ctrl+o to expand)
+● MariaDB is up (10.4.25). Let me mark task 1 in progress, create the inventory
+  database, and inspect the fresh Laravel install.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Laravel 13.17 installed, inventory DB created. Let me configure .env for MySQL
+  and install the Sanctum API scaffolding.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.env)
+  ⎿  Added 1 line, removed 1 line
+      1 -APP_NAME=Laravel                                                
+      1 +APP_NAME="Retail Inventory"                                     
+      2  APP_ENV=local
+      3  APP_KEY=base64:NjssvI5dZkmEzv9e3LOblVpm8Z9DTGwFeSmM6YKFcAE=
+      4  APP_DEBUG=true
+
+● Update(.env)
+  ⎿  Added 6 lines, removed 6 lines
+      20  LOG_DEPRECATIONS_CHANNEL=null
+      21  LOG_LEVEL=debug
+      22  
+      23 -DB_CONNECTION=sqlite                                           
+      24 -# DB_HOST=127.0.0.1                                            
+      25 -# DB_PORT=3306                                                 
+      26 -# DB_DATABASE=laravel                                          
+      27 -# DB_USERNAME=root                                             
+      28 -# DB_PASSWORD=                                                 
+      23 +DB_CONNECTION=mysql                                            
+      24 +DB_HOST=127.0.0.1                                              
+      25 +DB_PORT=3306                                                   
+      26 +DB_DATABASE=inventory                                          
+      27 +DB_USERNAME=root                                               
+      28 +DB_PASSWORD=                                                   
+      29  
+      30  SESSION_DRIVER=database
+      31  SESSION_LIFETIME=120
+
+● Update(.env)
+  ⎿  Added 1 line, removed 1 line
+      27  DB_USERNAME=root
+      28  DB_PASSWORD=
+      29  
+      30 -SESSION_DRIVER=database                                        
+      30 +SESSION_DRIVER=file                                            
+      31  SESSION_LIFETIME=120
+      32  SESSION_ENCRYPT=false
+      33  SESSION_PATH=/
+
+● Update(.env)
+  ⎿  Added 4 lines
+      63  AWS_USE_PATH_STYLE_ENDPOINT=false
+      64  
+      65  VITE_APP_NAME="${APP_NAME}"
+      66 +                                                               
+      67 +# Frontend origin for CORS / Sanctum                           
+      68 +FRONTEND_URL=http://localhost:5173                             
+      69 +SANCTUM_STATEFUL_DOMAINS=localhost:5173                        
+
+● Update(.env)
+  ⎿  Added 2 lines, removed 2 lines
+      35  
+      36  BROADCAST_CONNECTION=log
+      37  FILESYSTEM_DISK=local
+      38 -QUEUE_CONNECTION=database                                      
+      38 +QUEUE_CONNECTION=sync                                          
+      39  
+      40 -CACHE_STORE=database                                           
+      40 +CACHE_STORE=file                                               
+      41  # CACHE_PREFIX=
+      42  
+      43  MEMCACHED_HOST=127.0.0.1
+
+● Now install the API scaffolding (creates routes/api.php and installs Sanctum).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Sanctum is installed and its tables migrated into MySQL. Now let me scaffold
+  the React frontend (independent of backend work) so its npm install can run in
+  the background while I build the backend.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Frontend scaffolded. Let me install all frontend dependencies in the
+  background while I build the backend.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now I'll build the backend while deps install. First let me read the Laravel
+  13 skeleton's key wiring files.
+
+  Read 4 files (ctrl+o to expand)
+
+● Laravel 13 uses PHP attributes on models (#[Fillable], #[Hidden]) — I'll match
+  that idiom. Let me check the providers registration and config dir, then
+  build the backend in full.
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+❯ i forgot to tell you to make it moduler                                       
+
+● Background command "Install frontend dependencies (base + axios, router,
+tailwind, icons, toast)" completed (exit code 0)
+
+● Frontend deps installed (exit 0). And the user added a key requirement: make 
+  it modular. That changes the backend layout significantly — instead of
+  grouping by layer at the top level, I'll build a modular monolith: each domain
+  is a self-contained module under app/Modules/<Module>/ carrying all its
+  layers + its own ServiceProvider, routes, and migrations. This also better
+  matches the "microservices" intent (each module could later be extracted).
+
+  app/Modules/
+    Shared/     → BaseData (DTO), PaginatedData, ApiResponse, DomainException
+    Auth/       → Controller · Requests · DTOs · Mapper · Service(+contract) ·
+  Models/User · Provider · Routes
+    Category/   → Controller · Requests · DTOs · Mapper · Service(+contract) ·
+  Model · Migration · Factory · Provider · Routes
+    Product/    → …same vertical slice… (depends on Category)
+    Stock/      → …+ Enum, InsufficientStockException… (depends on Product)
+    Dashboard/  → Controller · DTO · Service(+contract) · Provider · Routes
+  (aggregates the others)
+
+  Let me update tracking and start writing the Shared layer.
+  Read 1 file (ctrl+o to expand)
+
+● Now I'll write the Shared layer and update auth config to point at the
+  relocated User model.
+
+● Update(config\auth.php)
+  ⎿  Added 1 line, removed 1 line
+      1  <?php
+      2  
+      3 -use App\Models\User;                                            
+      3 +use App\Modules\Auth\Models\User;                               
+      4  
+      5  return [
+      6  
+
+● Write(app\Modules\Shared\DTOs\BaseData.php)
+  ⎿  Wrote 35 lines to app\Modules\Shared\DTOs\BaseData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Shared\DTOs;
+       6 
+       7 use Illuminate\Contracts\Support\Arrayable;
+       8 use JsonSerializable;
+       9 
+      10 /**
+     … +29 lines (ctrl+o to expand)
+
+● Write(app\Modules\Shared\DTOs\PaginatedData.php)
+  ⎿  Wrote 71 lines to app\Modules\Shared\DTOs\PaginatedData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Shared\DTOs;
+       6 
+       7 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+       8 use Illuminate\Contracts\Support\Arrayable;
+       9 
+      10 /**
+     … +70 lines (ctrl+o to expand)
+
+● Write(app\Modules\Shared\Exceptions\DomainException.php)
+  ⎿  Wrote 32 lines to app\Modules\Shared\Exceptions\DomainException.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Shared\Exceptions;
+       6 
+       7 use RuntimeException;
+       8 use Throwable;
+       9 
+      10 /**
+     … +25 lines (ctrl+o to expand)
+
+● Write(app\Modules\Shared\Http\ApiResponse.php)
+  ⎿  Wrote 54 lines to app\Modules\Shared\Http\ApiResponse.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Shared\Http;
+       6 
+       7 use App\Modules\Shared\DTOs\PaginatedData;
+       8 use Illuminate\Http\JsonResponse;
+       9 
+      10 /**
+     … +50 lines (ctrl+o to expand)
+
+● Now the Auth module (including relocating the User model into it). First the
+  module base provider + User model + factory + DTOs + mapper:
+
+● Write(app\Modules\Shared\Providers\ModuleServiceProvider.php)
+  ⎿  Wrote 24 lines to
+     app\Modules\Shared\Providers\ModuleServiceProvider.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Shared\Providers;
+       6 
+       7 use Illuminate\Support\Facades\Route;
+       8 use Illuminate\Support\ServiceProvider;
+       9 
+      10 /**
+     … +16 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Models\User.php)
+  ⎿  Wrote 38 lines to app\Modules\Auth\Models\User.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Models;
+       6 
+       7 use App\Modules\Auth\Database\Factories\UserFactory;
+       8 use Illuminate\Database\Eloquent\Attributes\Fillable;
+       9 use Illuminate\Database\Eloquent\Attributes\Hidden;
+      10 use Illuminate\Database\Eloquent\Factories\Factory;
+     … +28 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Database\Factories\UserFactory.php)
+  ⎿  Wrote 41 lines to app\Modules\Auth\Database\Factories\UserFactory.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Database\Factories;
+       6 
+       7 use App\Modules\Auth\Models\User;
+       8 use Illuminate\Database\Eloquent\Factories\Factory;
+       9 use Illuminate\Support\Facades\Hash;
+      10 use Illuminate\Support\Str;
+     … +32 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\DTOs\UserDTO.php)
+  ⎿  Wrote 28 lines to app\Modules\Auth\DTOs\UserDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class UserDTO extends BaseData
+      10 {
+     … +18 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\DTOs\AuthTokenDTO.php)
+  ⎿  Wrote 26 lines to app\Modules\Auth\DTOs\AuthTokenDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class AuthTokenDTO extends BaseData
+      10 {
+     … +16 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\DTOs\RegisterData.php)
+  ⎿  Wrote 38 lines to app\Modules\Auth\DTOs\RegisterData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class RegisterData extends BaseData
+      10 {
+     … +28 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\DTOs\LoginData.php)
+  ⎿  Wrote 35 lines to app\Modules\Auth\DTOs\LoginData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class LoginData extends BaseData
+      10 {
+     … +25 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Mappers\UserMapper.php)
+  ⎿  Wrote 24 lines to app\Modules\Auth\Mappers\UserMapper.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Mappers;
+       6 
+       7 use App\Modules\Auth\DTOs\UserDTO;
+       8 use App\Modules\Auth\Models\User;
+       9 
+      10 /**
+     … +14 lines (ctrl+o to expand)
+
+● Now the Auth service, controller, requests, provider, and routes — plus
+  verifying the base Controller class:
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Services\Contracts\AuthServiceInterface.php)
+  ⎿  Wrote 28 lines to
+     app\Modules\Auth\Services\Contracts\AuthServiceInterface.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Services\Contracts;
+       6 
+       7 use App\Modules\Auth\DTOs\AuthTokenDTO;
+       8 use App\Modules\Auth\DTOs\LoginData;
+       9 use App\Modules\Auth\DTOs\RegisterData;
+      10 use App\Modules\Auth\DTOs\UserDTO;
+     … +19 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Services\AuthService.php)
+  ⎿  Wrote 77 lines to app\Modules\Auth\Services\AuthService.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Services;
+       6 
+       7 use App\Modules\Auth\DTOs\AuthTokenDTO;
+       8 use App\Modules\Auth\DTOs\LoginData;
+       9 use App\Modules\Auth\DTOs\RegisterData;
+      10 use App\Modules\Auth\DTOs\UserDTO;
+     … +72 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Requests\RegisterRequest.php)  ⎿  Wrote 28 lines to app\Modules\Auth\Requests\RegisterRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 use Illuminate\Validation\Rules\Password;
+       9 
+      10 class RegisterRequest extends FormRequest
+     … +20 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Requests\LoginRequest.php)
+  ⎿  Wrote 26 lines to app\Modules\Auth\Requests\LoginRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Auth\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 
+       9 class LoginRequest extends FormRequest
+      10 {
+     … +16 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Controllers\AuthController.php)
+  ⎿  Wrote 51 lines to app\Modules\Auth\Controllers\AuthController.php
+       1 <?php
+       2 
+       3 namespace App\Modules\Auth\Controllers;
+       4 
+       5 use App\Http\Controllers\Controller;
+       6 use App\Modules\Auth\DTOs\LoginData;
+       7 use App\Modules\Auth\DTOs\RegisterData;
+       8 use App\Modules\Auth\Requests\LoginRequest;
+       9 use App\Modules\Auth\Requests\RegisterRequest;
+      10 use App\Modules\Auth\Services\Contracts\AuthServiceInterface;
+     … +46 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Providers\AuthServiceProvider.php)
+  ⎿  Wrote 22 lines to app\Modules\Auth\Providers\AuthServiceProvider.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Auth\Providers;
+      6 
+      7 use App\Modules\Auth\Services\AuthService;
+      8 use App\Modules\Auth\Services\Contracts\AuthServiceInterface;
+      9 use App\Modules\Shared\Providers\ModuleServiceProvider;
+     … +13 lines (ctrl+o to expand)
+
+● Write(app\Modules\Auth\Routes\api.php)
+  ⎿  Wrote 16 lines to app\Modules\Auth\Routes\api.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use App\Modules\Auth\Controllers\AuthController;
+       7 
+       8 Route::prefix('auth')->group(function (): void {
+       9     Route::post('register', [AuthController::class, 'register'])
+         ;
+      10     Route::post('login', [AuthController::class, 'login']);
+     … +6 lines (ctrl+o to expand)
+
+● Base Controller confirmed. Auth module complete. Now I'll remove the old
+  User/factory (relocated) and build the Category module as the reference
+  vertical slice.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Write(app\Modules\Category\Models\Category.php)
+  ⎿  Wrote 38 lines to app\Modules\Category\Models\Category.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Models;
+       6 
+       7 use App\Modules\Category\Database\Factories\CategoryFactory;
+       8 use App\Modules\Product\Models\Product;
+       9 use Illuminate\Database\Eloquent\Attributes\Fillable;
+      10 use Illuminate\Database\Eloquent\Factories\Factory;
+     … +28 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Database\Migrations\2026_06_29_140000_create_catego
+       ries_table.php)
+  ⎿  Wrote 25 lines to app\Modules\Category\Database\Migrations\2026_06_29_
+     140000_create_categories_table.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use Illuminate\Database\Migrations\Migration;
+       6 use Illuminate\Database\Schema\Blueprint;
+       7 use Illuminate\Support\Facades\Schema;
+       8 
+       9 return new class extends Migration
+      10 {
+     … +16 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Database\Factories\CategoryFactory.php)
+  ⎿  Wrote 27 lines to
+     app\Modules\Category\Database\Factories\CategoryFactory.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Database\Factories;
+       6 
+       7 use App\Modules\Category\Models\Category;
+       8 use Illuminate\Database\Eloquent\Factories\Factory;
+       9 
+      10 /**
+     … +17 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\DTOs\CategoryDTO.php)
+  ⎿  Wrote 32 lines to app\Modules\Category\DTOs\CategoryDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class CategoryDTO extends BaseData
+      10 {
+     … +22 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\DTOs\CategoryData.php)
+  ⎿  Wrote 38 lines to app\Modules\Category\DTOs\CategoryData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\DTOs;
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 /**
+      10  * Input DTO carrying validated data for creating/updating a cat
+         egory.
+     … +30 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Mappers\CategoryMapper.php)
+  ⎿  Wrote 56 lines to app\Modules\Category\Mappers\CategoryMapper.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Category\Mappers;
+      6 
+      7 use App\Modules\Category\DTOs\CategoryData;
+      8 use App\Modules\Category\DTOs\CategoryDTO;
+      9 use App\Modules\Category\Models\Category;
+     … +48 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Services\Contracts\CategoryServiceInterface.php)
+  ⎿  Wrote 24 lines to
+     app\Modules\Category\Services\Contracts\CategoryServiceInterface.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Services\Contracts;
+       6 
+       7 use App\Modules\Category\DTOs\CategoryData;
+       8 use App\Modules\Category\DTOs\CategoryDTO;
+       9 
+      10 interface CategoryServiceInterface
+     … +15 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Services\CategoryService.php)
+  ⎿  Wrote 71 lines to app\Modules\Category\Services\CategoryService.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Services;
+       6 
+       7 use App\Modules\Category\DTOs\CategoryData;
+       8 use App\Modules\Category\DTOs\CategoryDTO;
+       9 use App\Modules\Category\Mappers\CategoryMapper;
+      10 use App\Modules\Category\Models\Category;
+     … +66 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Requests\StoreCategoryRequest.php)
+  ⎿  Wrote 26 lines to
+     app\Modules\Category\Requests\StoreCategoryRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 
+       9 class StoreCategoryRequest extends FormRequest
+      10 {
+     … +17 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Requests\UpdateCategoryRequest.php)
+  ⎿  Wrote 32 lines to
+     app\Modules\Category\Requests\UpdateCategoryRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Category\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 use Illuminate\Validation\Rule;
+       9 
+      10 class UpdateCategoryRequest extends FormRequest
+     … +23 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Controllers\CategoryController.php)
+  ⎿  Wrote 50 lines to
+     app\Modules\Category\Controllers\CategoryController.php
+       1 <?php
+       2 
+       3 namespace App\Modules\Category\Controllers;
+       4 
+       5 use App\Http\Controllers\Controller;
+       7 use App\Modules\Category\Requests\StoreCategoryRequest;
+       8 use App\Modules\Category\Requests\UpdateCategoryRequest;
+       9 use App\Modules\Category\Services\Contracts\CategoryServiceInter
+         face;
+      10 use App\Modules\Shared\Http\ApiResponse;
+     … +46 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Providers\CategoryServiceProvider.php)
+  ⎿  Wrote 23 lines to
+     app\Modules\Category\Providers\CategoryServiceProvider.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Category\Providers;
+      6 
+      7 use App\Modules\Category\Services\CategoryService;
+      8 use App\Modules\Category\Services\Contracts\CategoryServiceInterf
+        ace;
+      9 use App\Modules\Shared\Providers\ModuleServiceProvider;
+     … +16 lines (ctrl+o to expand)
+
+● Write(app\Modules\Category\Routes\api.php)
+  ⎿  Wrote 14 lines to app\Modules\Category\Routes\api.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       5 use App\Modules\Category\Controllers\CategoryController;
+       6 use Illuminate\Support\Facades\Route;
+       7 
+       8 Route::middleware('auth:sanctum')->group(function (): void {
+       9     Route::get('categories', [CategoryController::class, 'index'
+      10     Route::post('categories', [CategoryController::class, 'store
+         ']);
+     … +7 lines (ctrl+o to expand)
+
+● Category reference slice done. Now the Product module — the richest slice
+  (filters, pagination, nested category, and delegating opening stock to the
+  Stock service).
+● Write(app\Modules\Product\Models\Product.php)
+  ⎿  Wrote 74 lines to app\Modules\Product\Models\Product.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Models;
+       6 
+       7 use App\Modules\Category\Models\Category;
+       8 use App\Modules\Product\Database\Factories\ProductFactory;
+       9 use App\Modules\Stock\Models\StockMovement;
+      10 use Illuminate\Database\Eloquent\Attributes\Fillable;
+     … +65 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Database\Migrations\2026_06_29_140100_create_product
+       s_table.php)
+  ⎿  Wrote 38 lines to app\Modules\Product\Database\Migrations\2026_06_29_1
+     40100_create_products_table.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use Illuminate\Database\Migrations\Migration;
+       6 use Illuminate\Database\Schema\Blueprint;
+       7 use Illuminate\Support\Facades\Schema;
+       8 
+       9 return new class extends Migration
+      10 {
+     … +29 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Database\Factories\ProductFactory.php)
+  ⎿  Wrote 37 lines to
+     app\Modules\Product\Database\Factories\ProductFactory.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Product\Database\Factories;
+      6 
+      7 use App\Modules\Category\Models\Category;
+      8 use App\Modules\Product\Models\Product;
+      9 use Illuminate\Database\Eloquent\Factories\Factory;
+     … +29 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\DTOs\ProductDTO.php)
+  ⎿  Wrote 51 lines to app\Modules\Product\DTOs\ProductDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\DTOs;
+       6 
+       7 use App\Modules\Category\DTOs\CategoryDTO;
+       8 use App\Modules\Shared\DTOs\BaseData;
+       9 
+      10 final class ProductDTO extends BaseData
+     … +41 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\DTOs\ProductData.php)
+  ⎿  Wrote 59 lines to app\Modules\Product\DTOs\ProductData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 /**
+      10  * Input DTO for creating/updating a product's own attributes.
+     … +53 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\DTOs\ProductFilterData.php)
+  ⎿  Wrote 69 lines to app\Modules\Product\DTOs\ProductFilterData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       5 namespace App\Modules\Product\DTOs;
+       6 
+       7 /**
+       8  * Input DTO describing the query filters for listing products. 
+         Built from the
+          clamped paging).
+      10  */
+     … +68 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Mappers\ProductMapper.php)
+  ⎿  Wrote 78 lines to app\Modules\Product\Mappers\ProductMapper.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Mappers;
+       6 
+       7 use App\Modules\Category\Mappers\CategoryMapper;
+       8 use App\Modules\Product\DTOs\ProductData;
+       9 use App\Modules\Product\DTOs\ProductDTO;
+      10 use App\Modules\Product\Models\Product;
+     … +70 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Services\Contracts\ProductServiceInterface.php)
+  ⎿  Wrote 23 lines to
+     app\Modules\Product\Services\Contracts\ProductServiceInterface.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Services\Contracts;
+       6 
+       7 use App\Modules\Product\DTOs\ProductData;
+       8 use App\Modules\Product\DTOs\ProductDTO;
+       9 use App\Modules\Product\DTOs\ProductFilterData;
+      10 use App\Modules\Shared\DTOs\PaginatedData;
+     … +15 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Services\ProductService.php)
+  ⎿  Wrote 110 lines to app\Modules\Product\Services\ProductService.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Services;
+       6 
+       7 use App\Modules\Product\DTOs\ProductData;
+       8 use App\Modules\Product\DTOs\ProductDTO;
+       9 use App\Modules\Product\DTOs\ProductFilterData;
+      10 use App\Modules\Product\Mappers\ProductMapper;
+     … +111 lines (ctrl+o to expand)
+
+● Now the Product HTTP layer (requests, controller, provider, routes):
+
+● Write(app\Modules\Product\Requests\StoreProductRequest.php)
+  ⎿  Wrote 33 lines to app\Modules\Product\Requests\StoreProductRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 
+       9 class StoreProductRequest extends FormRequest
+      10 {
+     … +29 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Requests\UpdateProductRequest.php)
+  ⎿  Wrote 38 lines to
+     app\Modules\Product\Requests\UpdateProductRequest.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Product\Requests;
+       6 
+       7 use Illuminate\Foundation\Http\FormRequest;
+       8 use Illuminate\Validation\Rule;
+       9 
+      10 class UpdateProductRequest extends FormRequest
+     … +33 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Controllers\ProductController.php)
+  ⎿  Wrote 60 lines to
+     app\Modules\Product\Controllers\ProductController.php
+       1 <?php
+       2 
+       3 namespace App\Modules\Product\Controllers;
+       4 
+       5 use App\Http\Controllers\Controller;
+       7 use App\Modules\Product\DTOs\ProductFilterData;
+       8 use App\Modules\Product\Requests\StoreProductRequest;
+       9 use App\Modules\Product\Requests\UpdateProductRequest;
+      10 use App\Modules\Product\Services\Contracts\ProductServiceInterfa
+         ce;
+     … +54 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Providers\ProductServiceProvider.php)
+  ⎿  Wrote 23 lines to
+     app\Modules\Product\Providers\ProductServiceProvider.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Product\Providers;
+      6 
+      7 use App\Modules\Product\Services\Contracts\ProductServiceInterfac
+        e;
+      8 use App\Modules\Product\Services\ProductService;
+      9 use App\Modules\Shared\Providers\ModuleServiceProvider;
+     … +15 lines (ctrl+o to expand)
+
+● Write(app\Modules\Product\Routes\api.php)
+  ⎿  Wrote 14 lines to app\Modules\Product\Routes\api.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use App\Modules\Product\Controllers\ProductController;
+       7 
+       8 Route::middleware('auth:sanctum')->group(function (): void {
+       9     Route::get('products', [ProductController::class, 'index']);
+      10     Route::post('products', [ProductController::class, 'store'])
+         ;
+     … +7 lines (ctrl+o to expand)
+
+● Now the Stock module — enum, ledger model, the transactional adjust business
+  logic with lockForUpdate, and the insufficient-stock domain exception:
+
+● Write(app\Modules\Stock\Enums\StockMovementType.php)
+  ⎿  Wrote 29 lines to app\Modules\Stock\Enums\StockMovementType.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\Enums;
+       6 
+       7 enum StockMovementType: string
+       8 {
+       9     case In = 'in';
+      10     case Out = 'out';
+     … +20 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Models\StockMovement.php)
+  ⎿  Wrote 57 lines to app\Modules\Stock\Models\StockMovement.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\Models;
+       6 
+       7 use App\Modules\Auth\Models\User;
+       8 use App\Modules\Product\Models\Product;
+       9 use App\Modules\Stock\Enums\StockMovementType;
+      10 use Illuminate\Database\Eloquent\Attributes\Fillable;
+     … +49 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Database\Migrations\2026_06_29_140200_create_stock_mov
+       ements_table.php)
+  ⎿  Wrote 33 lines to app\Modules\Stock\Database\Migrations\2026_06_29_140
+     200_create_stock_movements_table.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use Illuminate\Database\Migrations\Migration;
+       6 use Illuminate\Database\Schema\Blueprint;
+       7 use Illuminate\Support\Facades\Schema;
+       8 
+       9 return new class extends Migration
+      10 {
+     … +26 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\DTOs\StockMovementDTO.php)
+  ⎿  Wrote 46 lines to app\Modules\Stock\DTOs\StockMovementDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class StockMovementDTO extends BaseData
+      10 {
+     … +36 lines (ctrl+o to expand)
+● Write(app\Modules\Stock\DTOs\StockAdjustmentData.php)
+  ⎿  Wrote 32 lines to app\Modules\Stock\DTOs\StockAdjustmentData.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\DTOs;
+       6 
+       7 use App\Modules\Stock\Enums\StockMovementType;
+       8 
+       9 /**
+      10  * Input DTO describing a requested stock change.
+     … +23 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Exceptions\InsufficientStockException.php)
+  ⎿  Wrote 22 lines to
+     app\Modules\Stock\Exceptions\InsufficientStockException.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\Exceptions;
+       6 
+       7 use App\Modules\Shared\Exceptions\DomainException;
+       8 
+       9 final class InsufficientStockException extends DomainException
+      10 {
+     … +13 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Mappers\StockMovementMapper.php)
+  ⎿  Wrote 55 lines to app\Modules\Stock\Mappers\StockMovementMapper.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\Mappers;
+       6 
+       7 use App\Modules\Stock\DTOs\StockMovementDTO;
+       8 use App\Modules\Stock\Models\StockMovement;
+       9 
+      10 final class StockMovementMapper
+     … +49 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Services\Contracts\StockServiceInterface.php)
+  ⎿  Wrote 29 lines to
+     app\Modules\Stock\Services\Contracts\StockServiceInterface.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Stock\Services\Contracts;
+      6 
+      7 use App\Modules\Shared\DTOs\PaginatedData;
+      8 use App\Modules\Stock\DTOs\StockAdjustmentData;
+      9 use App\Modules\Stock\DTOs\StockMovementDTO;
+     … +21 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Services\StockService.php)
+  ⎿  Wrote 96 lines to app\Modules\Stock\Services\StockService.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Stock\Services;
+       6 
+       7 use App\Modules\Product\Models\Product;
+       8 use App\Modules\Shared\DTOs\PaginatedData;
+       9 use App\Modules\Shared\Exceptions\DomainException;
+      10 use App\Modules\Stock\DTOs\StockAdjustmentData;
+     … +95 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Requests\AdjustStockRequest.php)
+  ⎿  Wrote 29 lines to app\Modules\Stock\Requests\AdjustStockRequest.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Stock\Requests;
+      6 
+      7 use App\Modules\Stock\Enums\StockMovementType;
+      8 use Illuminate\Foundation\Http\FormRequest;
+      9 use Illuminate\Validation\Rule;
+     … +21 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Controllers\StockController.php)
+  ⎿  Wrote 45 lines to app\Modules\Stock\Controllers\StockController.php
+       1 <?php
+       2 
+       3 namespace App\Modules\Stock\Controllers;
+       4 
+       5 use App\Http\Controllers\Controller;
+       6 use App\Modules\Shared\Http\ApiResponse;
+       7 use App\Modules\Stock\DTOs\StockAdjustmentData;
+       8 use App\Modules\Stock\Requests\AdjustStockRequest;
+       9 use App\Modules\Stock\Services\Contracts\StockServiceInterface;
+      10 use Illuminate\Http\JsonResponse;
+     … +42 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Providers\StockServiceProvider.php)
+  ⎿  Wrote 23 lines to app\Modules\Stock\Providers\StockServiceProvider.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Stock\Providers;
+      6 
+      7 use App\Modules\Shared\Providers\ModuleServiceProvider;
+      8 use App\Modules\Stock\Services\Contracts\StockServiceInterface;
+      9 use App\Modules\Stock\Services\StockService;
+     … +15 lines (ctrl+o to expand)
+
+● Write(app\Modules\Stock\Routes\api.php)
+  ⎿  Wrote 12 lines to app\Modules\Stock\Routes\api.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       5 use App\Modules\Stock\Controllers\StockController;
+       6 use Illuminate\Support\Facades\Route;
+       7 
+       8 Route::middleware('auth:sanctum')->group(function (): void {
+       9     Route::get('stock-movements', [StockController::class, 'inde
+      10     Route::get('products/{product}/stock-movements', [StockContr
+         oller::class, 'history'])->whereNumber('product');
+     … +5 lines (ctrl+o to expand)
+
+● Now the Dashboard module — the cross-module aggregator:
+
+● Write(app\Modules\Dashboard\DTOs\DashboardSummaryDTO.php)
+  ⎿  Wrote 42 lines to app\Modules\Dashboard\DTOs\DashboardSummaryDTO.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Dashboard\DTOs;
+       6 
+       7 use App\Modules\Shared\DTOs\BaseData;
+       8 
+       9 final class DashboardSummaryDTO extends BaseData
+      10 {
+     … +36 lines (ctrl+o to expand)
+
+● Write(app\Modules\Dashboard\Services\Contracts\DashboardServiceInterface.php)
+  ⎿  Wrote 12 lines to
+     app\Modules\Dashboard\Services\Contracts\DashboardServiceInterface.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Dashboard\Services\Contracts;
+       6 
+       7 use App\Modules\Dashboard\DTOs\DashboardSummaryDTO;
+       8 
+       9 interface DashboardServiceInterface
+      10 {
+     … +2 lines (ctrl+o to expand)
+
+● Write(app\Modules\Dashboard\Services\DashboardService.php)
+  ⎿  Wrote 48 lines to app\Modules\Dashboard\Services\DashboardService.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 namespace App\Modules\Dashboard\Services;
+       7 use App\Modules\Category\Models\Category;
+       8 use App\Modules\Dashboard\DTOs\DashboardSummaryDTO;
+       9 use App\Modules\Dashboard\Services\Contracts\DashboardServiceInt
+         erface;
+      10 use App\Modules\Product\Mappers\ProductMapper;
+     … +46 lines (ctrl+o to expand)
+
+● Write(app\Modules\Dashboard\Controllers\DashboardController.php)
+  ⎿  Wrote 21 lines to
+     app\Modules\Dashboard\Controllers\DashboardController.php
+       1 <?php
+       2 
+       3 namespace App\Modules\Dashboard\Controllers;
+       4 
+       5 use App\Http\Controllers\Controller;
+         erface;
+       7 use App\Modules\Shared\Http\ApiResponse;
+       8 use Illuminate\Http\JsonResponse;
+       9 
+      10 final class DashboardController extends Controller
+     … +12 lines (ctrl+o to expand)
+
+● Write(app\Modules\Dashboard\Providers\DashboardServiceProvider.php)
+  ⎿  Wrote 22 lines to
+     app\Modules\Dashboard\Providers\DashboardServiceProvider.php
+      1 <?php
+      2 
+      3 declare(strict_types=1);
+      4 
+      5 namespace App\Modules\Dashboard\Providers;
+      6 
+      7 use App\Modules\Dashboard\Services\Contracts\DashboardServiceInte
+        rface;
+      8 use App\Modules\Dashboard\Services\DashboardService;
+      9 use App\Modules\Shared\Providers\ModuleServiceProvider;
+     … +14 lines (ctrl+o to expand)
+
+● Write(app\Modules\Dashboard\Routes\api.php)
+  ⎿  Wrote 10 lines to app\Modules\Dashboard\Routes\api.php
+       1 <?php
+       2 
+       3 declare(strict_types=1);
+       4 
+       5 use App\Modules\Dashboard\Controllers\DashboardController;
+       7 
+       8 Route::middleware('auth:sanctum')->group(function (): void {
+       9     Route::get('dashboard/summary', [DashboardController::class,
+          'summary']);
+      10 });
+     … +1 line (ctrl+o to expand)
+
+● All modules written. Now I'll wire everything together: register module
+  providers, central exception rendering, CORS config, and a public health route
+  — plus read the seeder to rewrite it.
+
+● Write(bootstrap\providers.php)
+  ⎿  Added 6 lines, removed 3 lines
+       1  <?php
+       2  
+       3 -use App\Providers\AppServiceProvider;                          
+       4 -                                                               
+       3  return [
+       6 -    AppServiceProvider::class,                                 
+       4 +    App\Providers\AppServiceProvider::class,                   
+       5 +    App\Modules\Auth\Providers\AuthServiceProvider::class,     
+       6 +    App\Modules\Category\Providers\CategoryServiceProvider::cla
+         +ss,                                                            
+       7 +    App\Modules\Product\Providers\ProductServiceProvider::class
+         +,                                                              
+       8 +    App\Modules\Stock\Providers\StockServiceProvider::class,   
+       9 +    App\Modules\Dashboard\Providers\DashboardServiceProvider::c
+         +lass,                                                          
+      10  ];
+
+● Write(bootstrap\app.php)
+  ⎿  Added 20 lines
+      1  <?php
+      2  
+      3 +use App\Modules\Shared\Exceptions\DomainException;              
+      4 +use Illuminate\Database\Eloquent\ModelNotFoundException;        
+      5  use Illuminate\Foundation\Application;
+      6  use Illuminate\Foundation\Configuration\Exceptions;
+      7  use Illuminate\Foundation\Configuration\Middleware;
+     ...
+      21          $exceptions->shouldRenderJsonWhen(
+      22              fn (Request $request) => $request->is('api/*'),
+      23          );
+      24 +                                                               
+      25 +        // Business-rule violations carry their own HTTP status
+         +.                                                              
+      26 +        $exceptions->render(function (DomainException $e, Reque
+         +st $request) {                                                 
+      27 +            if ($request->is('api/*')) {                       
+      28 +                return response()->json(['message' => $e->getMe
+         +ssage()], $e->status());                                       
+      29 +            }                                                  
+      30 +                                                               
+      31 +            return null;                                       
+      32 +        });                                                    
+      33 +                                                               
+      34 +        // Friendlier 404 for missing records on the API.      
+      35 +        $exceptions->render(function (ModelNotFoundException $e
+         +, Request $request) {                                          
+      36 +            if ($request->is('api/*')) {                       
+      37 +                return response()->json(['message' => 'Resource
+         + not found.'], 404);                                           
+      38 +            }                                                  
+      39 +                                                               
+      40 +            return null;                                       
+      41 +        });                                                    
+      42      })->create();
+
+● Write(config\cors.php)
+  ⎿  Wrote 36 lines to config\cors.php
+       1 <?php
+       2 
+       4 
+       5     /*
+       6     |-----------------------------------------------------------
+       7     | Cross-Origin Resource Sharing (CORS) Configuration
+       8     |-----------------------------------------------------------
+         ---------------
+      10     | The API uses stateless bearer-token (Sanctum) authenticati
+         on, so cookies
+     … +30 lines (ctrl+o to expand)
+● Write(routes\api.php)
+  ⎿  Added 17 lines, removed 4 lines
+       1  <?php
+       2  
+       3 -use Illuminate\Http\Request;                                   
+       3 +declare(strict_types=1);                                       
+       4 +                                                               
+       5  use Illuminate\Support\Facades\Route;
+       6  
+       6 -Route::get('/user', function (Request $request) {              
+       7 -    return $request->user();                                   
+       8 -})->middleware('auth:sanctum');                                
+       7 +/*                                                             
+       8 +|--------------------------------------------------------------
+         +------------                                                   
+       9 +| API Routes                                                   
+      10 +|--------------------------------------------------------------
+         +------------                                                   
+      11 +|                                                              
+      12 +| Each feature module registers its own routes from its service
+         + provider                                                      
+      13 +| (see app/Modules/<Module>/Routes/api.php). Only cross-cutting
+         + endpoints                                                     
+      14 +| live here.                                                   
+      15 +|                                                              
+      16 +*/                                                             
+      17 +                                                               
+      18 +Route::get('/ping', fn () => response()->json([                
+      19 +    'message' => 'pong',                                       
+      20 +    'app' => config('app.name'),                               
+      21 +]));                                                           
+
+  Read 1 file (ctrl+o to expand)
+
+● Now the seeder with realistic retail data (routing stock through the
+  StockService so the ledger stays consistent, and engineering some
+  low/out-of-stock items so the dashboard is meaningful):
+
+● Write(database\seeders\DatabaseSeeder.php)
+  ⎿  Added 94 lines, removed 10 lines
+        1  <?php
+        2  
+        3 +declare(strict_types=1);                                      
+        4 +                                                              
+        5  namespace Database\Seeders;
+        6  
+        5 -use App\Models\User;                                          
+        6 -use Illuminate\Database\Console\Seeds\WithoutModelEvents;     
+        7 +use App\Modules\Auth\Models\User;                             
+        8 +use App\Modules\Category\Models\Category;                     
+        9 +use App\Modules\Product\Models\Product;                       
+       10 +use App\Modules\Stock\DTOs\StockAdjustmentData;               
+       11 +use App\Modules\Stock\Enums\StockMovementType;                
+       12 +use App\Modules\Stock\Services\Contracts\StockServiceInterface
+          +;                                                             
+       13  use Illuminate\Database\Seeder;
+       14  
+       15  class DatabaseSeeder extends Seeder
+       16  {
+       11 -    use WithoutModelEvents;                                   
+       12 -                                                              
+       17      /**
+       14 -     * Seed the application's database.                       
+       18 +     * Seed the application's database with a demo retail cata
+          +logue.                                                        
+       19       */
+       20      public function run(): void
+       21      {
+       18 -        // User::factory(10)->create();                       
+       22 +        $user = User::query()->firstOrCreate(                 
+       23 +            ['email' => 'demo@retail.test'],                  
+       24 +            ['name' => 'Demo Manager', 'password' => 'password
+          +'],                                                           
+       25 +        );                                                    
+       26  
+       20 -        User::factory()->create([                             
+       21 -            'name' => 'Test User',                            
+       22 -            'email' => 'test@example.com',                    
+       23 -        ]);                                                   
+       27 +        /** @var StockServiceInterface $stock */              
+       28 +        $stock = app(StockServiceInterface::class);           
+       29 +                                                              
+       30 +        foreach ($this->catalogue() as $categoryName => $rows)
+          + {                                                            
+       31 +            $category = Category::query()->firstOrCreate(     
+       32 +                ['name' => $categoryName],                    
+       33 +                ['description' => $categoryName.' product line
+          +.'],                                                          
+       34 +            );                                                
+       35 +                                                              
+       36 +            foreach ($rows as $row) {                         
+       37 +                $product = Product::query()->firstOrCreate(   
+       38 +                    ['sku' => $row['sku']],                   
+       39 +                    [                                         
+       40 +                        'category_id' => $category->id,       
+       41 +                        'name' => $row['name'],               
+       42 +                        'description' => $row['description'] ?
+          +? null,                                                       
+       43 +                        'price' => $row['price'],             
+       44 +                        'cost' => $row['cost'],               
+       45 +                        'reorder_level' => $row['reorder'],   
+       46 +                        'is_active' => $row['active'] ?? true,
+       47 +                        'quantity' => 0,                      
+       48 +                    ],                                        
+       49 +                );                                            
+       50 +                                                              
+       51 +                if (! $product->wasRecentlyCreated) {         
+       52 +                    continue;                                 
+       53 +                }                                             
+       54 +                                                              
+       55 +                if ($row['opening'] > 0) {                    
+       56 +                    $stock->adjust(                           
+       57 +                        $product->id,                         
+       58 +                        new StockAdjustmentData(StockMovementT
+          +ype::In, $row['opening'], 'Opening stock'),                   
+       59 +                        $user->id,                            
+       60 +                    );                                        
+       61 +                }                                             
+       62 +                                                              
+       63 +                if (($row['sold'] ?? 0) > 0) {                
+       64 +                    $stock->adjust(                           
+       65 +                        $product->id,                         
+       66 +                        new StockAdjustmentData(StockMovementT
+          +ype::Out, $row['sold'], 'Customer sale'),                     
+       67 +                        $user->id,                            
+       68 +                    );                                        
+       69 +                }                                             
+       70 +            }                                                 
+       71 +        }                                                     
+       72      }
+       73 +                                                              
+       74 +    /**                                                       
+       75 +     * @return array<string, array<int, array<string, mixed>>>
+       76 +     */                                                       
+       77 +    private function catalogue(): array                       
+       78 +    {                                                         
+       79 +        return [                                              
+       80 +            'Beverages' => [                                  
+       81 +                ['sku' => 'BEV-001', 'name' => 'Spring Water 5
+          +00ml', 'price' => 0.90, 'cost' => 0.40, 'reorder' => 50, 'open
+          +ing' => 240, 'sold' => 60, 'description' => 'Still mineral wat
+          +er, 500ml bottle.'],                                          
+       82 +                ['sku' => 'BEV-002', 'name' => 'Cola Can 330ml
+          +', 'price' => 1.20, 'cost' => 0.55, 'reorder' => 80, 'opening'
+          + => 300, 'sold' => 250, 'description' => 'Classic cola, 330ml 
+          +can.'],                                                       
+       83 +                ['sku' => 'BEV-003', 'name' => 'Orange Juice 1
+          +L', 'price' => 2.75, 'cost' => 1.40, 'reorder' => 30, 'opening
+          +' => 90, 'sold' => 18],                                       
+       84 +                ['sku' => 'BEV-004', 'name' => 'Ground Coffee 
+          +250g', 'price' => 5.50, 'cost' => 3.10, 'reorder' => 20, 'open
+          +ing' => 40, 'sold' => 9],                                     
+       85 +            ],                                                
+       86 +            'Snacks' => [                                     
+       87 +                ['sku' => 'SNK-001', 'name' => 'Potato Chips 1
+          +50g', 'price' => 1.80, 'cost' => 0.85, 'reorder' => 40, 'openi
+          +ng' => 120, 'sold' => 35],                                    
+       88 +                ['sku' => 'SNK-002', 'name' => 'Chocolate Bar 
+          +100g', 'price' => 1.50, 'cost' => 0.70, 'reorder' => 60, 'open
+          +ing' => 200, 'sold' => 175],                                  
+       89 +                ['sku' => 'SNK-003', 'name' => 'Mixed Nuts 200
+          +g', 'price' => 3.20, 'cost' => 1.90, 'reorder' => 25, 'opening
+          +' => 50, 'sold' => 12],                                       
+       90 +            ],                                                
+       91 +            'Household' => [                                  
+       92 +                ['sku' => 'HOU-001', 'name' => 'Dish Soap 750m
+          +l', 'price' => 2.40, 'cost' => 1.10, 'reorder' => 30, 'opening
+          +' => 80, 'sold' => 20],                                       
+       93 +                ['sku' => 'HOU-002', 'name' => 'Paper Towels 6
+          +-pack', 'price' => 4.90, 'cost' => 2.60, 'reorder' => 25, 'ope
+          +ning' => 60, 'sold' => 55],                                   
+       94 +                ['sku' => 'HOU-003', 'name' => 'Laundry Deterg
+          +ent 2L', 'price' => 8.50, 'cost' => 5.00, 'reorder' => 15, 'op
+          +ening' => 30, 'sold' => 30],                                  
+       95 +            ],                                                
+       96 +            'Electronics' => [                                
+       97 +                ['sku' => 'ELE-001', 'name' => 'AA Batteries 4
+          +-pack', 'price' => 3.99, 'cost' => 1.80, 'reorder' => 40, 'ope
+          +ning' => 100, 'sold' => 30],                                  
+       98 +                ['sku' => 'ELE-002', 'name' => 'USB-C Cable 1m
+          +', 'price' => 6.99, 'cost' => 2.50, 'reorder' => 20, 'opening'
+          + => 45, 'sold' => 15],                                        
+       99 +                ['sku' => 'ELE-003', 'name' => 'LED Bulb 9W', 
+          +'price' => 4.25, 'cost' => 1.95, 'reorder' => 30, 'opening' =>
+          + 70, 'sold' => 25],                                           
+      100 +                ['sku' => 'ELE-004', 'name' => 'Wireless Mouse
+          +', 'price' => 14.99, 'cost' => 7.50, 'reorder' => 10, 'opening
+          +' => 20, 'sold' => 4, 'active' => false],                     
+      101 +            ],                                                
+      102 +            'Personal Care' => [                              
+      103 +                ['sku' => 'PER-001', 'name' => 'Toothpaste 100
+          +ml', 'price' => 2.10, 'cost' => 0.95, 'reorder' => 35, 'openin
+          +g' => 90, 'sold' => 22],                                      
+      104 +                ['sku' => 'PER-002', 'name' => 'Shampoo 400ml'
+          +, 'price' => 4.60, 'cost' => 2.30, 'reorder' => 25, 'opening' 
+          +=> 55, 'sold' => 14],                                         
+      105 +                ['sku' => 'PER-003', 'name' => 'Bar Soap 3-pac
+          +k', 'price' => 2.80, 'cost' => 1.20, 'reorder' => 30, 'opening
+          +' => 75, 'sold' => 60],                                       
+      106 +            ],                                                
+      107 +        ];                                                    
+      108 +    }                                                         
+      109  }
+
+● All modules wired. Now regenerate the autoloader and run migrations (this also
+  boots every provider and route file — a first real smoke test of the wiring).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Migrations applied cleanly — all module providers booted without error. Now
+  seed the demo data and confirm the routes registered:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All 19 routes registered across modules. Let me verify the seeded data and
+  that the stock ledger is internally consistent (product quantity == last
+  movement's quantity_after):
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Seed data is solid — 17 products across 5 categories, 34 ledger movements,
+  low/out-of-stock items present, and zero ledger inconsistencies (product
+  quantity matches the last movement everywhere).
+
+  Let me boot the API server and run an end-to-end HTTP smoke test (auth →
+  protected endpoints → business-rule error).
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Server is up. Let me run a full end-to-end smoke test via Node (covering auth,
+  protected access, pagination, creation, and the insufficient-stock business
+  rule):
+
+● Write(C:\Users\Bcc\AppData\Local\Temp\claude\D--GitHub-inventory\d481df57-8e49
+       -4d8f-bc80-088461d01999\scratchpad\smoke.mjs)
+  ⎿  Wrote 85 lines to C:\Users\Bcc\AppData\Local\Temp\claude\D--GitHub-inv
+     entory\d481df57-8e49-4d8f-bc80-088461d01999\scratchpad\smoke.mjs
+       1 const BASE = 'http://127.0.0.1:8000/api';
+       2 let token = null;
+       4 
+       5 async function call(method, path, { body, auth = true, expect = 
+         200 } = {}) {
+       7   if (body) headers['Content-Type'] = 'application/json';
+       8   if (auth && token) headers['Authorization'] = `Bearer ${token}
+         `;
+         body ? JSON.stringify(body) : undefined });
+      10   let data = null;
+     … +107 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Backend is fully working — 18/18 end-to-end checks pass: auth, RBAC-gated
+  routes, dashboard aggregation, pagination/filtering, validation (422), the
+  insufficient-stock rule (422), and the category-has-products rule (409). The
+  layered flow (Controller → Service → BL → Mapper → DTO) is proven over HTTP.
+
+  Read 3 files (ctrl+o to expand)
+
+● Frontend stack confirmed: React 19, React Router v7, Tailwind v4 (Vite
+  plugin), axios, lucide-react, react-hot-toast. The build runs tsc -b so I must
+  respect the TS strictness. Let me read the TS config and the default files
+  before writing.
+
+  Read 3 files (ctrl+o to expand)
+● Now I understand the constraints: verbatimModuleSyntax (use import type),
+  noUnusedLocals/Parameters, and erasableSyntaxOnly (no enum). The default
+  index.css/App.tsx have template styling I must replace. Let me build the
+  frontend foundation — config, types, API client, and resource modules.
+
+● Write(D:/GitHub/inventory/Apps/Frontend/vite.config.ts)
+  ⎿  Added 5 lines, removed 1 line
+       1  import { defineConfig } from 'vite'
+       2  import react from '@vitejs/plugin-react'
+       3 +import tailwindcss from '@tailwindcss/vite'                    
+       4  
+       5  // https://vite.dev/config/
+       6  export default defineConfig({
+       6 -  plugins: [react()],                                          
+       7 +  plugins: [react(), tailwindcss()],                           
+       8 +  server: {                                                    
+       9 +    port: 5173,                                                
+      10 +  },                                                           
+      11  })
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/index.css)
+  ⎿  Added 8 lines, removed 102 lines
+        1 -:root {                                                       
+        2 -  --text: #6b6375;                                            
+        3 -  --text-h: #08060d;                                          
+        4 -  --bg: #fff;                                                 
+        5 -  --border: #e5e4e7;                                          
+        6 -  --code-bg: #f4f3ec;                                         
+        7 -  --accent: #aa3bff;                                          
+        8 -  --accent-bg: rgba(170, 59, 255, 0.1);                       
+        9 -  --accent-border: rgba(170, 59, 255, 0.5);                   
+       10 -  --social-bg: rgba(244, 243, 236, 0.5);                      
+       11 -  --shadow:                                                   
+       12 -    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0
+          - 4px 6px -2px;                                                
+        1 +@import "tailwindcss";                                        
+        2  
+       14 -  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;          
+       15 -  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;       
+       16 -  --mono: ui-monospace, Consolas, monospace;                  
+       17 -                                                              
+       18 -  font: 18px/145% var(--sans);                                
+       19 -  letter-spacing: 0.18px;                                     
+       20 -  color-scheme: light dark;                                   
+       21 -  color: var(--text);                                         
+       22 -  background: var(--bg);                                      
+       23 -  font-synthesis: none;                                       
+       24 -  text-rendering: optimizeLegibility;                         
+       25 -  -webkit-font-smoothing: antialiased;                        
+       26 -  -moz-osx-font-smoothing: grayscale;                         
+       27 -                                                              
+       28 -  @media (max-width: 1024px) {                                
+       29 -    font-size: 16px;                                          
+       30 -  }                                                           
+        3 +:root {                                                       
+        4 +  color-scheme: light;                                        
+        5  }
+        6  
+       33 -@media (prefers-color-scheme: dark) {                         
+       34 -  :root {                                                     
+       35 -    --text: #9ca3af;                                          
+       36 -    --text-h: #f3f4f6;                                        
+       37 -    --bg: #16171d;                                            
+       38 -    --border: #2e303a;                                        
+       39 -    --code-bg: #1f2028;                                       
+       40 -    --accent: #c084fc;                                        
+       41 -    --accent-bg: rgba(192, 132, 252, 0.15);                   
+       42 -    --accent-border: rgba(192, 132, 252, 0.5);                
+       43 -    --social-bg: rgba(47, 48, 58, 0.5);                       
+       44 -    --shadow:                                                 
+       45 -      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25)
+          - 0 4px 6px -2px;                                              
+       46 -  }                                                           
+       47 -                                                              
+       48 -  #social .button-icon {                                      
+       49 -    filter: invert(1) brightness(2);                          
+       50 -  }                                                           
+       51 -}                                                             
+       52 -                                                              
+        7 +html,                                                         
+        8 +body,                                                         
+        9  #root {
+       54 -  width: 1126px;                                              
+       55 -  max-width: 100%;                                            
+       56 -  margin: 0 auto;                                             
+       57 -  text-align: center;                                         
+       58 -  border-inline: 1px solid var(--border);                     
+       59 -  min-height: 100svh;                                         
+       60 -  display: flex;                                              
+       61 -  flex-direction: column;                                     
+       62 -  box-sizing: border-box;                                     
+       10 +  height: 100%;                                               
+       11  }
+       12  
+       13  body {
+       14    margin: 0;
+       15 +  background-color: #f1f5f9;                                  
+       16 +  font-family: system-ui, "Segoe UI", Roboto, sans-serif;     
+       17  }
+       68 -                                                              
+       69 -h1,                                                           
+       70 -h2 {                                                          
+       71 -  font-family: var(--heading);                                
+       72 -  font-weight: 500;                                           
+       73 -  color: var(--text-h);                                       
+       74 -}                                                             
+       75 -                                                              
+       76 -h1 {                                                          
+       77 -  font-size: 56px;                                            
+       78 -  letter-spacing: -1.68px;                                    
+       79 -  margin: 32px 0;                                             
+       80 -  @media (max-width: 1024px) {                                
+       81 -    font-size: 36px;                                          
+       82 -    margin: 20px 0;                                           
+       83 -  }                                                           
+       84 -}                                                             
+       85 -h2 {                                                          
+       86 -  font-size: 24px;                                            
+       87 -  line-height: 118%;                                          
+       88 -  letter-spacing: -0.24px;                                    
+       89 -  margin: 0 0 8px;                                            
+       90 -  @media (max-width: 1024px) {                                
+       91 -    font-size: 20px;                                          
+       92 -  }                                                           
+       93 -}                                                             
+       94 -p {                                                           
+       95 -  margin: 0;                                                  
+       96 -}                                                             
+       97 -                                                              
+       98 -code,                                                         
+       99 -.counter {                                                    
+      100 -  font-family: var(--mono);                                   
+      101 -  display: inline-flex;                                       
+      102 -  border-radius: 4px;                                         
+      103 -  color: var(--text-h);                                       
+      104 -}                                                             
+      105 -                                                              
+      106 -code {                                                        
+      107 -  font-size: 15px;                                            
+      108 -  line-height: 135%;                                          
+      109 -  padding: 4px 8px;                                           
+      110 -  background: var(--code-bg);                                 
+      111 -}                                                             
+
+● Write(D:/GitHub/inventory/Apps/Frontend/.env)
+  ⎿  Wrote 1 lines to ..\Frontend\.env
+      1 VITE_API_URL=http://127.0.0.1:8000/api
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/types.ts)
+  ⎿  Wrote 95 lines to ..\Frontend\src\types.ts
+       1 // API contract types — mirror the Laravel DTOs (snake_case JSON
+          keys).
+       2 
+       3 export interface ApiItem<T> {
+       4   data: T
+       6 }
+       7 
+       8 export interface ApiList<T> {
+       9   data: T[]
+      10   message?: string
+     … +86 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/lib/api.ts)
+  ⎿  Wrote 67 lines to ..\Frontend\src\lib\api.ts
+       1 import axios from 'axios'
+       2 
+       3 const baseURL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.
+         1:8000/api'
+       4 
+       6   baseURL,
+       7   headers: { Accept: 'application/json' },
+       8 })
+       9 
+      10 const TOKEN_KEY = 'retail.token'
+     … +63 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/lib/format.ts)
+  ⎿  Wrote 29 lines to ..\Frontend\src\lib\format.ts
+       1 const currencyFormatter = new Intl.NumberFormat('en-US', {
+       2   style: 'currency',
+       3   currency: 'USD',
+       4 })
+       5 
+       7 
+       8 export function formatCurrency(value: number | null | undefined)
+         : string {
+       9   if (value === null || value === undefined) return '—'
+      10   return currencyFormatter.format(value)
+     … +22 lines (ctrl+o to expand)
+
+● Now the API resource modules and the auth context:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/api/auth.ts)
+  ⎿  Wrote 21 lines to ..\Frontend\src\api\auth.ts
+      1 import { api } from '../lib/api'
+      2 import type { ApiItem, AuthToken, User } from '../types'
+      3 
+      4 export interface RegisterPayload {
+      5   name: string
+      6   email: string
+      7   password: string
+      8   password_confirmation: string
+      9 }
+     … +15 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/api/categories.ts)
+  ⎿  Wrote 24 lines to ..\Frontend\src\api\categories.ts
+       1 import { api } from '../lib/api'
+       2 import type { ApiItem, ApiList, Category } from '../types'
+       3 
+       4 export interface CategoryPayload {
+       5   name: string
+       6   description?: string | null
+       7 }
+       8 
+       9 export const categoriesApi = {
+      10   list: (): Promise<Category[]> =>
+     … +19 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/api/products.ts)
+  ⎿  Wrote 51 lines to ..\Frontend\src\api\products.ts
+       1 import { api } from '../lib/api'
+       2 import type { ApiItem, ApiPaginated, Product } from '../types'
+       3 
+       4 export interface ProductFilters {
+       5   search?: string
+       6   category_id?: number | ''
+       7   low_stock?: boolean
+       8   is_active?: boolean | ''
+       9   sort_by?: string
+      10   sort_dir?: 'asc' | 'desc'
+     … +49 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/api/stock.ts)
+  ⎿  Wrote 25 lines to ..\Frontend\src\api\stock.ts
+       1 import { api } from '../lib/api'
+       2 import type { ApiItem, ApiList, ApiPaginated, StockMovement, Sto
+         ckMovementType } from '../types'
+       3 
+       4 export interface StockAdjustmentPayload {
+       6   quantity: number
+       7   reason?: string | null
+       8 }
+       9 
+      10 export const stockApi = {
+     … +21 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/api/dashboard.ts)
+  ⎿  Wrote 7 lines to ..\Frontend\src\api\dashboard.ts
+      1 import { api } from '../lib/api'
+      2 import type { ApiItem, DashboardSummary } from '../types'
+      3 
+      4 export const dashboardApi = {
+      5   summary: (): Promise<DashboardSummary> =>
+      6     api.get<ApiItem<DashboardSummary>>('/dashboard/summary').then
+        ((r) => r.data.data),
+      7 }
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/context/AuthContext.tsx)
+  ⎿  Wrote 86 lines to ..\Frontend\src\context\AuthContext.tsx
+       1 import { createContext, useContext, useEffect, useState } from '
+         react'
+       2 import type { ReactNode } from 'react'
+       3 import { authApi } from '../api/auth'
+       4 import { tokenStore } from '../lib/api'
+       6 
+       7 interface AuthContextValue {
+       8   user: User | null
+       9   loading: boolean
+      10   login: (email: string, password: string) => Promise<void>
+     … +82 lines (ctrl+o to expand)
+
+● Now the reusable UI component library (Tailwind-styled primitives):
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/components/ui.tsx)
+  ⎿  Wrote 273 lines to ..\Frontend\src\components\ui.tsx
+       1 import { useEffect } from 'react'
+       2 import type {
+       3   ButtonHTMLAttributes,
+       4   InputHTMLAttributes,
+       5   ReactNode,
+       6   SelectHTMLAttributes,
+       7   TextareaHTMLAttributes,
+       8 } from 'react'
+       9 import { Loader2, X } from 'lucide-react'
+      10 import type { PaginationMeta } from '../types'
+     … +310 lines (ctrl+o to expand)
+
+● Now the app shell (Layout, ProtectedRoute) and a shared stock-status badge:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/components/ProtectedRoute.tsx)
+  ⎿  Wrote 21 lines to ..\Frontend\src\components\ProtectedRoute.tsx
+       1 import { Navigate, Outlet } from 'react-router-dom'
+       2 import { useAuth } from '../context/AuthContext'
+       3 import { PageSpinner } from './ui'
+       4 
+       5 export function ProtectedRoute() {
+       7 
+       8   if (loading) {
+       9     return (
+      10       <div className="flex min-h-full items-center justify-cente
+         r">
+     … +11 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/components/StockStatusBadge.tsx)
+  ⎿  Wrote 12 lines to ..\Frontend\src\components\StockStatusBadge.tsx
+       1 import { Badge } from './ui'
+       2 import type { Product } from '../types'
+       3 
+       4 export function StockStatusBadge({ product }: { product: Product
+          }) {
+       6     return <Badge tone="red">Out of stock</Badge>
+       7   }
+       8   if (product.is_low_stock) {
+       9     return <Badge tone="amber">Low stock</Badge>
+      10   }
+     … +3 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/components/Layout.tsx)
+  ⎿  Wrote 90 lines to ..\Frontend\src\components\Layout.tsx
+       1 import { NavLink, Outlet } from 'react-router-dom'
+       2 import { LayoutDashboard, LogOut, Package, Store, Tags } from 'l
+         ucide-react'
+       3 import type { LucideIcon } from 'lucide-react'
+       4 import { useAuth } from '../context/AuthContext'
+       6 
+       7 interface NavItem {
+       8   to: string
+       9   label: string
+      10   icon: LucideIcon
+     … +92 lines (ctrl+o to expand)
+● The h-4.5 utility isn't in Tailwind's default scale — let me fix that to a
+  valid size.
+
+● Update(D:/GitHub/inventory/Apps/Frontend/src/components/Layout.tsx)
+  ⎿  Added 1 line, removed 1 line
+      34              )
+      35            }
+      36          >
+      37 -          <Icon className="h-4.5 w-4.5" />                     
+      37 +          <Icon className="h-4 w-4" />                         
+      38            {label}
+      39          </NavLink>
+      40        ))}
+
+● Now the authentication pages:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/LoginPage.tsx)
+  ⎿  Wrote 98 lines to ..\Frontend\src\pages\LoginPage.tsx
+       1 import { useState } from 'react'
+       2 import type { FormEvent } from 'react'
+       3 import { Link, Navigate, useNavigate } from 'react-router-dom'
+       4 import toast from 'react-hot-toast'
+       5 import { Store } from 'lucide-react'
+       6 import { useAuth } from '../context/AuthContext'
+       7 import { apiErrorMessage } from '../lib/api'
+       8 import { Button, Card, Field, Input } from '../components/ui'
+       9 
+      10 export function LoginPage() {
+     … +96 lines (ctrl+o to expand)
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/RegisterPage.tsx)
+  ⎿  Wrote 109 lines to ..\Frontend\src\pages\RegisterPage.tsx
+       1 import { useState } from 'react'
+       2 import type { FormEvent } from 'react'
+       3 import { Link, Navigate, useNavigate } from 'react-router-dom'
+       4 import toast from 'react-hot-toast'
+       5 import { Store } from 'lucide-react'
+       6 import { useAuth } from '../context/AuthContext'
+       7 import { apiErrorMessage } from '../lib/api'
+       8 import { Button, Card, Field, Input } from '../components/ui'
+       9 
+      10 export function RegisterPage() {
+     … +107 lines (ctrl+o to expand)
+
+● Now the Dashboard page with KPI cards, low-stock list, and recent activity:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/DashboardPage.tsx)
+  ⎿  Wrote 186 lines to ..\Frontend\src\pages\DashboardPage.tsx
+       1 import { useEffect, useState } from 'react'
+       2 import { Link } from 'react-router-dom'
+       3 import toast from 'react-hot-toast'
+       4 import {
+       5   AlertTriangle,
+       6   Boxes,
+       7   DollarSign,
+       8   Package,
+       9   PackageX,
+      10   Tags,
+     … +200 lines (ctrl+o to expand)
+
+● Now the Categories page (list + create/edit modal + delete):
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/CategoriesPage.tsx)
+  ⎿  Wrote 183 lines to ..\Frontend\src\pages\CategoriesPage.tsx
+      1 import { useEffect, useState } from 'react'
+      2 import type { FormEvent } from 'react'
+      3 import toast from 'react-hot-toast'
+      4 import { Pencil, Plus, Trash2 } from 'lucide-react'
+      5 import { categoriesApi } from '../api/categories'
+      6 import { apiErrorMessage } from '../lib/api'
+      7 import { Button, Card, EmptyState, Field, Input, Modal, PageSpinn
+        er, Textarea } from '../components/ui'
+      8 import { formatDateTime } from '../lib/format'
+      9 import type { Category } from '../types'
+     … +192 lines (ctrl+o to expand)
+
+● Now the Products page — the richest screen (search, category/low-stock
+  filters, sorting, pagination, and a full create/edit modal):
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductsPage.tsx)
+  ⎿  Wrote 437 lines to ..\Frontend\src\pages\ProductsPage.tsx
+       1 import { useEffect, useMemo, useState } from 'react'
+       2 import type { ChangeEvent, FormEvent } from 'react'
+       3 import { Link } from 'react-router-dom'
+       4 import toast from 'react-hot-toast'
+       5 import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+       7 import { productsApi } from '../api/products'
+       8 import type { ProductFilters, ProductPayload } from '../api/prod
+         ucts'
+       9 import { apiErrorMessage } from '../lib/api'
+      10 import {
+     … +478 lines (ctrl+o to expand)
+
+● Now the Product detail page (info + stock-adjustment form + paginated movement
+  history), then wire up routing:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductDetailPage.tsx)
+  ⎿  Wrote 250 lines to ..\Frontend\src\pages\ProductDetailPage.tsx
+       1 import { useCallback, useEffect, useState } from 'react'
+       2 import type { FormEvent } from 'react'
+       3 import { Link, useParams } from 'react-router-dom'
+       4 import toast from 'react-hot-toast'
+       5 import { ArrowLeft } from 'lucide-react'
+       6 import { productsApi } from '../api/products'
+       7 import { stockApi } from '../api/stock'
+       8 import { apiErrorMessage } from '../lib/api'
+       9 import {
+      10   Badge,
+     … +278 lines (ctrl+o to expand)
+
+● Two fixes needed in the detail page: React.ReactNode (no React import under
+  the JSX runtime) and an unused historyPage state (would trip noUnusedLocals).
+
+● Update(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductDetailPage.tsx)
+  ⎿  Added 1 line, removed 1 line
+      1  import { useCallback, useEffect, useState } from 'react'
+      2 -import type { FormEvent } from 'react'                          
+      2 +import type { FormEvent, ReactNode } from 'react'               
+      3  import { Link, useParams } from 'react-router-dom'
+      4  import toast from 'react-hot-toast'
+      5  import { ArrowLeft } from 'lucide-react'
+
+● Update(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductDetailPage.tsx)
+  ⎿  Added 1 line, removed 1 line
+      21  import { formatCurrency, formatDateTime, formatNumber } from '.
+          ./lib/format'
+      22  import type { ApiPaginated, Product, StockMovement, StockMoveme
+          ntType } from '../types'
+      23  
+      24 -function DetailRow({ label, value }: { label: string; value: Re
+         -act.ReactNode }) {                                             
+      24 +function DetailRow({ label, value }: { label: string; value: Re
+         +actNode }) {                                                   
+      25    return (
+      26      <div className="flex items-center justify-between py-2">
+      27        <span className="text-sm text-slate-500">{label}</span>
+
+● Update(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductDetailPage.tsx)
+  ⎿  Removed 1 line
+      49    const [product, setProduct] = useState<Product | null>(null)
+      50    const [history, setHistory] = useState<ApiPaginated<StockMove
+          ment> | null>(null)
+      51    const [loading, setLoading] = useState(true)
+      52 -  const [historyPage, setHistoryPage] = useState(1)            
+      52  
+      53    const [type, setType] = useState<StockMovementType>('in')
+      54    const [quantity, setQuantity] = useState('1')
+
+● Update(D:/GitHub/inventory/Apps/Frontend/src/pages/ProductDetailPage.tsx)
+  ⎿  Removed 1 line
+      63      (page: number) => {
+      64        return stockApi.history(productId, page).then((res) => {
+      65          setHistory(res)
+      66 -        setHistoryPage(page)                                   
+      66        })
+      67      },
+      68      [productId],
+
+● Now wire up routing and providers in App.tsx:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/src/App.tsx)
+  ⎿  Added 29 lines, removed 113 lines
+        1 -import { useState } from 'react'                              
+        2 -import reactLogo from './assets/react.svg'                    
+        3 -import viteLogo from './assets/vite.svg'                      
+        4 -import heroImg from './assets/hero.png'                       
+        5 -import './App.css'                                            
+        1 +import { BrowserRouter, Navigate, Route, Routes } from 'react-
+          +router-dom'                                                   
+        2 +import { Toaster } from 'react-hot-toast'                     
+        3 +import { AuthProvider } from './context/AuthContext'          
+        4 +import { ProtectedRoute } from './components/ProtectedRoute'  
+        5 +import { Layout } from './components/Layout'                  
+        6 +import { LoginPage } from './pages/LoginPage'                 
+        7 +import { RegisterPage } from './pages/RegisterPage'           
+        8 +import { DashboardPage } from './pages/DashboardPage'         
+        9 +import { ProductsPage } from './pages/ProductsPage'           
+       10 +import { ProductDetailPage } from './pages/ProductDetailPage' 
+       11 +import { CategoriesPage } from './pages/CategoriesPage'       
+       12  
+       13  function App() {
+        8 -  const [count, setCount] = useState(0)                       
+        9 -                                                              
+       14    return (
+       11 -    <>                                                        
+       12 -      <section id="center">                                   
+       13 -        <div className="hero">                                
+       14 -          <img src={heroImg} className="base" width="170" heig
+          -ht="179" alt="" />                                            
+       15 -          <img src={reactLogo} className="framework" alt="Reac
+          -t logo" />                                                    
+       16 -          <img src={viteLogo} className="vite" alt="Vite logo"
+          - />                                                           
+       17 -        </div>                                                
+       18 -        <div>                                                 
+       19 -          <h1>Get started</h1>                                
+       20 -          <p>                                                 
+       21 -            Edit <code>src/App.tsx</code> and save to test <co
+          -de>HMR</code>                                                 
+       22 -          </p>                                                
+       23 -        </div>                                                
+       24 -        <button                                               
+       25 -          type="button"                                       
+       26 -          className="counter"                                 
+       27 -          onClick={() => setCount((count) => count + 1)}      
+       28 -        >                                                     
+       29 -          Count is {count}                                    
+       30 -        </button>                                             
+       31 -      </section>                                              
+       15 +    <AuthProvider>                                            
+       16 +      <BrowserRouter>                                         
+       17 +        <Toaster position="top-right" />                      
+       18 +        <Routes>                                              
+       19 +          <Route path="/login" element={<LoginPage />} />     
+       20 +          <Route path="/register" element={<RegisterPage />} /
+          +>                                                             
+       21  
+       33 -      <div className="ticks"></div>                           
+       22 +          <Route element={<ProtectedRoute />}>                
+       23 +            <Route element={<Layout />}>                      
+       24 +              <Route path="/" element={<DashboardPage />} />  
+       25 +              <Route path="/products" element={<ProductsPage /
+          +>} />                                                         
+       26 +              <Route path="/products/:id" element={<ProductDet
+          +ailPage />} />                                                
+       27 +              <Route path="/categories" element={<CategoriesPa
+          +ge />} />                                                     
+       28 +            </Route>                                          
+       29 +          </Route>                                            
+       30  
+       35 -      <section id="next-steps">                               
+       36 -        <div id="docs">                                       
+       37 -          <svg className="icon" role="presentation" aria-hidde
+          -n="true">                                                     
+       38 -            <use href="/icons.svg#documentation-icon"></use>  
+       39 -          </svg>                                              
+       40 -          <h2>Documentation</h2>                              
+       41 -          <p>Your questions, answered</p>                     
+       42 -          <ul>                                                
+       43 -            <li>                                              
+       44 -              <a href="https://vite.dev/" target="_blank">    
+       45 -                <img className="logo" src={viteLogo} alt="" />
+       46 -                Explore Vite                                  
+       47 -              </a>                                            
+       48 -            </li>                                             
+       49 -            <li>                                              
+       50 -              <a href="https://react.dev/" target="_blank">   
+       51 -                <img className="button-icon" src={reactLogo} a
+          -lt="" />                                                      
+       52 -                Learn more                                    
+       53 -              </a>                                            
+       54 -            </li>                                             
+       55 -          </ul>                                               
+       56 -        </div>                                                
+       57 -        <div id="social">                                     
+       58 -          <svg className="icon" role="presentation" aria-hidde
+          -n="true">                                                     
+       59 -            <use href="/icons.svg#social-icon"></use>         
+       60 -          </svg>                                              
+       61 -          <h2>Connect with us</h2>                            
+       62 -          <p>Join the Vite community</p>                      
+       63 -          <ul>                                                
+       64 -            <li>                                              
+       65 -              <a href="https://github.com/vitejs/vite" target=
+          -"_blank">                                                     
+       66 -                <svg                                          
+       67 -                  className="button-icon"                     
+       68 -                  role="presentation"                         
+       69 -                  aria-hidden="true"                          
+       70 -                >                                             
+       71 -                  <use href="/icons.svg#github-icon"></use>   
+       72 -                </svg>                                        
+       73 -                GitHub                                        
+       74 -              </a>                                            
+       75 -            </li>                                             
+       76 -            <li>                                              
+       77 -              <a href="https://chat.vite.dev/" target="_blank"
+          ->                                                             
+       78 -                <svg                                          
+       79 -                  className="button-icon"                     
+       80 -                  role="presentation"                         
+       81 -                  aria-hidden="true"                          
+       82 -                >                                             
+       83 -                  <use href="/icons.svg#discord-icon"></use>  
+       84 -                </svg>                                        
+       85 -                Discord                                       
+       86 -              </a>                                            
+       87 -            </li>                                             
+       88 -            <li>                                              
+       89 -              <a href="https://x.com/vite_js" target="_blank">
+       90 -                <svg                                          
+       91 -                  className="button-icon"                     
+       92 -                  role="presentation"                         
+       93 -                  aria-hidden="true"                          
+       94 -                >                                             
+       95 -                  <use href="/icons.svg#x-icon"></use>        
+       96 -                </svg>                                        
+       97 -                X.com                                         
+       98 -              </a>                                            
+       99 -            </li>                                             
+      100 -            <li>                                              
+      101 -              <a href="https://bsky.app/profile/vite.dev" targ
+          -et="_blank">                                                  
+      102 -                <svg                                          
+      103 -                  className="button-icon"                     
+      104 -                  role="presentation"                         
+      105 -                  aria-hidden="true"                          
+      106 -                >                                             
+      107 -                  <use href="/icons.svg#bluesky-icon"></use>  
+      108 -                </svg>                                        
+      109 -                Bluesky                                       
+      110 -              </a>                                            
+      111 -            </li>                                             
+      112 -          </ul>                                               
+      113 -        </div>                                                
+      114 -      </section>                                              
+      115 -                                                              
+      116 -      <div className="ticks"></div>                           
+      117 -      <section id="spacer"></section>                         
+      118 -    </>                                                       
+       31 +          <Route path="*" element={<Navigate to="/" replace />
+          +} />                                                          
+       32 +        </Routes>                                             
+       33 +      </BrowserRouter>                                        
+       34 +    </AuthProvider>                                           
+       35    )
+       36  }
+       37  
+● Frontend is complete. Let me run the production build (tsc -b && vite build)
+  to catch any type or build errors:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Frontend builds cleanly — TypeScript typecheck passed and Vite bundled 119 
+  modules with no errors, Tailwind compiled. Let me fix the page title and
+  confirm the dev server boots and serves.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(D:/GitHub/inventory/Apps/Frontend/index.html)
+  ⎿  Added 1 line, removed 1 line
+       4      <meta charset="UTF-8" />
+       5      <link rel="icon" type="image/svg+xml" href="/favicon.svg" /
+          >
+       6      <meta name="viewport" content="width=device-width, initial-
+          scale=1.0" />
+       7 -    <title>frontend</title>                                    
+       7 +    <title>Retail Inventory</title>                            
+       8    </head>
+       9    <body>
+      10      <div id="root"></div>
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Let me confirm the dev server is serving and that the SPA HTML loads:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Dev server serves the SPA (title updated, module transforms OK). The one
+  integration path the Node smoke test didn't cover is browser CORS (it sends no
+  Origin). Let me verify a preflight + cross-origin request from the React
+  origin is allowed:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Browser CORS verified — preflight returns Access-Control-Allow-Origin: 
+  http://localhost:5173 and the cross-origin login succeeds (200). The full
+  stack is wired and working end-to-end. Frontend task complete.
+
+● Now the high-value orchestration: a multi-dimensional adversarial review of
+  the whole codebase (backend correctness, security, layered-architecture
+  consistency, frontend correctness, and the frontend↔backend contract), where
+  each finding is independently verified against the actual code before I act on
+  it.
+
+● Workflow(Multi-dimensional adversarial review of the Laravel + React retail
+          MVP, with per-finding verification)
+  ⎿  /workflows to view dynamic workflow runs
+
+● The review workflow is running in the background. While it works, let me write
+  the documentation and align the backend .env.example so a fresh clone is
+  reproducible.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.env.example)
+  ⎿  Added 1 line, removed 1 line
+      1 -APP_NAME=Laravel                                                
+      1 +APP_NAME="Retail Inventory"                                     
+      2  APP_ENV=local
+      3  APP_KEY=
+      4  APP_DEBUG=true
+
+● Update(.env.example)
+  ⎿  Added 7 lines, removed 7 lines
+      20  LOG_DEPRECATIONS_CHANNEL=null
+      21  LOG_LEVEL=debug
+      22  
+      23 -DB_CONNECTION=sqlite                                           
+      24 -# DB_HOST=127.0.0.1                                            
+      25 -# DB_PORT=3306                                                 
+      26 -# DB_DATABASE=laravel                                          
+      27 -# DB_USERNAME=root                                             
+      28 -# DB_PASSWORD=                                                 
+      23 +DB_CONNECTION=mysql                                            
+      24 +DB_HOST=127.0.0.1                                              
+      25 +DB_PORT=3306                                                   
+      26 +DB_DATABASE=inventory                                          
+      27 +DB_USERNAME=root                                               
+      28 +DB_PASSWORD=                                                   
+      29  
+      30 -SESSION_DRIVER=database                                        
+      30 +SESSION_DRIVER=file                                            
+      31  SESSION_LIFETIME=120
+      32  SESSION_ENCRYPT=false
+      33  SESSION_PATH=/
+
+● Update(.env.example)
+  ⎿  Added 2 lines, removed 2 lines
+      35  
+      36  BROADCAST_CONNECTION=log
+      37  FILESYSTEM_DISK=local
+      38 -QUEUE_CONNECTION=database                                      
+      38 +QUEUE_CONNECTION=sync                                          
+      39  
+      40 -CACHE_STORE=database                                           
+      40 +CACHE_STORE=file                                               
+      41  # CACHE_PREFIX=
+      42  
+      43  MEMCACHED_HOST=127.0.0.1
+
+● Update(.env.example)
+  ⎿  Added 4 lines
+      63  AWS_USE_PATH_STYLE_ENDPOINT=false
+      64  
+      65  VITE_APP_NAME="${APP_NAME}"
+      66 +                                                               
+      67 +# Frontend origin for CORS / Sanctum                           
+      68 +FRONTEND_URL=http://localhost:5173                             
+      69 +SANCTUM_STATEFUL_DOMAINS=localhost:5173                        
+
+● Now the main README documenting the architecture and setup, plus a frontend
+  env example:
+
+● Write(D:/GitHub/inventory/Apps/Frontend/.env.example)
+  ⎿  Wrote 2 lines to ..\Frontend\.env.example
+      1 # Base URL of the Laravel API (no trailing slash)
+      2 VITE_API_URL=http://127.0.0.1:8000/api
+
+● Write(D:/GitHub/inventory/Apps/README.md)  ⎿  Wrote 189 lines to ..\README.md
+      1 # Retail Inventory — MVP
+      2 
+      3 A small retail **inventory management** application:
+      5 - **Backend** — Laravel 13 REST API, built as a **modular monolit
+        h** with a strict layered
+      6   architecture (**Controller → Service → Business Logic → Mapper 
+        → DTO**, over per‑module Eloquent Models).
+      7 - **Frontend** — React 19 + TypeScript + Vite + Tailwind CSS SPA 
+      8 - **Auth** — Laravel Sanctum bearer tokens.
+      9 - **Database** — MySQL / MariaDB.
+     … +239 lines (ctrl+o to expand)
+
+● Documentation and .env examples are in place. The multi-dimensional review
+  workflow (5 reviewers × per-finding adversarial verification) is still running
+  in the background — I'll apply any confirmed fixes as soon as it reports
+  back.
+
+  Status so far — the MVP is built and verified working end-to-end:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────┐
+  │           Area           │                    Result                    │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Scaffold (Laravel 13 +   │                                              │
+  │ Sanctum +                │ ✅                                           │
+  │ Vite/React/TS/Tailwind + │                                              │
+  │  MySQL)                  │                                              │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Modular backend —        │                                              │
+  │ Shared, Auth, Category,  │ ✅ each a full vertical slice                │
+  │ Product, Stock,          │ (Controller→Service→BL→Mapper→DTO→Model)     │
+  │ Dashboard                │                                              │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Migrations + seed        │ ✅ 5 categories, 17 products, 34 ledger      │
+  │                          │ rows, 0 ledger inconsistencies               │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │                          │ ✅ 18/18 — auth, 401 gating,                 │
+  │ API smoke test (over     │ pagination/filtering, validation 422,        │
+  │ HTTP)                    │ insufficient-stock 422,                      │
+  │                          │ category-has-products 409                    │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Frontend build (tsc -b + │ ✅ clean, 119 modules                        │
+  │  Vite)                   │                                              │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Dev server + browser     │ ✅ allowed for localhost:5173                │
+  │ CORS preflight           │                                              │
+  └──────────────────────────┴──────────────────────────────────────────────┘
+
+  Both servers are currently running for verification (API on :8000, SPA on
+  :5173).
+
+  I'll continue automatically once the review finishes and report the findings +
+  fixes.
+
+✻ Cooked for 40m 22s
+
+● No completion record was found for background workflow "retail-mvp-review"
+from the previous session. It may have been stopped (via the UI or TaskStop —
+these leave no transcript marker), or it may have been running when the previous
+Claude Code process exited. To pick up where it left off, relaunch with
+Workflow({scriptPath, resumeFromRunId: "wf_1e0f17c5-963"}) — completed agent()
+calls return cached.
+  ⎿  You've hit your session limit · resets 9:30pm (Asia/Riyadh)
+     /usage-credits to request more usage from your admin.
+
+✻ Churned for 9s
+
+❯ /effort                                                                       
+  ⎿  Set effort level to xhigh (saved as your default for new sessions): Deeper
+     reasoning than high, just below maximum (Fable 5, Opus 4.7+)
+
+❯ /effort                                                                       
+  ⎿  Set effort level to ultracode (this session only): xhigh + dynamic workflow
+     orchestration
+
+❯ continue                                                                      
+
+● The review workflow was interrupted when the previous session ended. Let me
+  resume it — completed reviewer/verifier agents return cached results, so it
+  picks up where it stopped.
+  ⎿  Dynamic workflow cancelled
+
+❯ continue                                                                      
+
+● Understood — I'll skip the re-run and finish the review directly myself.
+
+  Let me check what's still running (the previous session's processes likely
+  exited), then re-verify the backend is green and do a focused self-review.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Everything from the prior session is still up (MariaDB, API on :8000, SPA on
+  :5173) and data persists (17 products). No backend code changed since the
+  18/18 pass, so it's still green — but let me re-confirm and additionally
+  exercise the logout token-revocation lifecycle (the one auth path the smoke
+  test didn't cover):
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Both checks pass: 18/18 smoke test still green, and the logout lifecycle works
+  (token valid → logout 200 → reused token now 401, i.e. properly revoked).
+
+  Since I skipped the review workflow, I did a focused manual review of the
+  least-verified surfaces myself. Walking the full frontend↔backend contract and
+  the runtime-risk areas:
+
+  - Contract — every endpoint the SPA calls matches method/path/payload/response
+  shape; nullable fields (category, cost, meta) are guarded in the
+  formatters/components. ✓
+  - Security — sort/filter use a whitelist + parameterized bindings (no SQL
+  injection), every resource route sits behind auth:sanctum, passwords hashed
+  via the model cast, mass assignment scoped by #[Fillable]. ✓
+  - Correctness — the int route-param coercion, the ProductService→StockService
+  container wiring, decimal→float mapping, enum casting, and the
+  transactional/locked stock writes are all exercised by the passing tests. ✓
+
+  No defects found. Two cosmetic non-issues only (an unused
+  Product::isLowStock() helper since the mapper computes the flag, and one
+  redundant mount-time fetch from the search debounce) — neither affects
+  behavior, so I left them.
+
+● Done — the retail inventory MVP is built, wired, and verified end-to-end.
+
+  Both servers are running right now, so you can open it immediately:
+
+  ▶️ Open it
+
+  - App: http://localhost:5173  → log in with demo@retail.test / password
+  - API: http://127.0.0.1:8000/api
+
+  (If a server isn't up after a reboot: cd Backend && php artisan serve and cd 
+  Frontend && npm run dev. Full setup is in Apps/README.md.)
+
+  What you got
+
+  Backend — Laravel 13 modular monolith (Backend/app/Modules/), each module a
+  self‑contained vertical slice with the exact layering you asked for:
+
+  Controller → Service (interface) → Business Logic (impl) → Mapper (Model⇄DTO)
+  → DTO
+                                            └── Eloquent Models
+
+  ┌───────────┬──────────────────────────────────────────────────────────────┐
+  │  Module   │                             Owns                             │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Shared    │ BaseData DTO, PaginatedData, ApiResponse, DomainException,   │
+  │           │ base ModuleServiceProvider                                   │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Auth      │ register / login / logout / me — Sanctum tokens (User model  │
+  │           │ lives here)                                                  │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Category  │ full CRUD + own migration/factory                            │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Product   │ CRUD + search/filter/sort/pagination; delegates opening      │
+  │           │ stock to Stock                                               │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Stock     │ transactional, row‑locked in/out/adjustment ledger;          │
+  │           │ InsufficientStockException                                   │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ Dashboard │ read‑only KPI aggregation across modules                     │
+  └───────────┴──────────────────────────────────────────────────────────────┘
+
+  Each module registers its own routes + migrations + interface→implementation
+  binding from its own service provider.
+
+  Frontend — React 19 + TS + Vite + Tailwind SPA (Frontend/src/): typed API
+  client with bearer-token interceptor, auth context + protected routes, and
+  pages for Login/Register, Dashboard, Products (+ create/edit), Product detail 
+  with stock adjustment & movement history, and Categories.
+
+  Verified (not just written)
+
+  - Migrations + seed: 5 categories, 17 products, 34 ledger rows — 0 ledger 
+  inconsistencies (every product's quantity equals its last movement).
+  - API over HTTP — 18/18: auth, 401 gating, pagination/filtering, validation
+  422, insufficient‑stock 422, category‑has‑products 409.
+  - Auth lifecycle: login → logout → reused token correctly 401 (revoked).
+  - Frontend: tsc -b typecheck + Vite build clean (119 modules); dev server
+  serves; browser CORS preflight allowed for localhost:5173.
+
+  A couple of decisions I made for you
+
+  - "Microservices" → modular monolith: literal separate services would be
+  overkill for a simple MVP, so each module is service‑oriented and cleanly
+  extractable later. Say the word if you actually want them split into separate
+  deployables.
+  - Set SESSION/CACHE/QUEUE to file/sync so the API is self‑contained (no extra
+  infra), and moved the User model into the Auth module for consistency.
+
+  Everything is documented in Apps/README.md (architecture, setup, full API
+  table, response envelope, business rules).
+
+  Want me to add automated PHPUnit/Vitest tests, role-based permissions, or the
+  Sales module next?
+
+✻ Sautéed for 3m 37s
+
+※ recap: Built a retail inventory MVP: Laravel 13 modular layered API plus a React/TS SPA, fully verified and running on ports 8000 and 5173. Next action is awaiting your direction, optionally adding tests, roles, or a Sales module. (disable recaps in /config)
