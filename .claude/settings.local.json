@@ -25,7 +25,10 @@
       "Bash(npx vitest *)",
       "PowerShell(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -ne $null } | Select-Object Name, @{n='UsedGB';e={[math]::Round\\($_.Used/1GB,1\\)}}, @{n='FreeGB';e={[math]::Round\\($_.Free/1GB,2\\)}} | Format-Table -AutoSize)",
       "Bash(npm config *)",
-      "Bash(echo \"cache -> $\\(npm config get cache\\)\")"
+      "Bash(echo \"cache -> $\\(npm config get cache\\)\")",
+      "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://127.0.0.1:8000/docs/openapi.json)",
+      "Bash(curl -s http://127.0.0.1:8000/docs/openapi.json)",
+      "Bash(curl -s http://127.0.0.1:8000/docs)"
     ]
   }
 }

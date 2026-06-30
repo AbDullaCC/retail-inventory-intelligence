@@ -54,6 +54,7 @@ A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Servi
 - **`bootstrap/providers.php`** registers every module's `*ServiceProvider`.
 - Each provider extends `Shared\Providers\ModuleServiceProvider`, **binds its `Service` interface to its implementation** in `register()`, and in `boot()` calls `loadApiRoutes()` (wraps the module's `Routes/api.php` in the `/api` prefix + `api` middleware) and `loadMigrationsFrom()`. So routes and migrations are per-module, not central. `routes/api.php` only holds `/api/ping`.
 - **`Shared\Http\ApiResponse`** defines the response envelope: `{ data, message? }` for items, `{ data, meta }` for paginated lists, `{ message }` for bare messages. DTOs implement `JsonSerializable`, so controllers return them directly through `ApiResponse`.
+- **API docs** are spec-first in `app/Support/OpenApi/OpenApiSpec.php` (a hand-authored OpenAPI 3.0 array), served as Swagger UI at `/docs` and JSON at `/docs/openapi.json` (`DocsController`, `routes/web.php`). When you add/change an endpoint, update this spec — it is not generated from code.
 - **`Shared\Exceptions\DomainException`** carries an HTTP status; `bootstrap/app.php` renders it (and `ModelNotFoundException`) to JSON for `api/*` routes. Throw it from services for business-rule violations (e.g. `InsufficientStockException` → 422, category-has-products → 409).
 
 ### Cross-module + domain rules that aren't obvious

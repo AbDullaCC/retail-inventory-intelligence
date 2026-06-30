@@ -124,6 +124,10 @@ password: password
 
 ## API reference
 
+> **Interactive docs (Swagger UI):** with the backend running, open
+> **http://127.0.0.1:8000/docs**. The raw OpenAPI 3.0 spec is at `/docs/openapi.json`.
+> Use **Authorize** in the UI to paste a bearer token and try endpoints live.
+
 All routes are prefixed with `/api`. Every route except `ping`, `auth/register` and `auth/login`
 requires the header `Authorization: Bearer <token>`.
 
