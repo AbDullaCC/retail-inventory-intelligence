@@ -178,6 +178,32 @@ requires the header `Authorization: Bearer <token>`.
 
 ---
 
+## Testing
+
+**Backend** — PHPUnit, against an in-memory SQLite DB (configured in `phpunit.xml`):
+
+```bash
+cd Backend
+php artisan test
+```
+
+54 tests covering: pure units (enum, `PaginatedData`, `ProductFilterData`, all mappers),
+service business logic (stock math, insufficient-stock & category-has-products rules,
+dashboard aggregation), and HTTP feature tests (auth + token revocation, products
+CRUD/validation/pagination, stock adjustments, category `409`).
+
+**Frontend** — Vitest + Testing Library (jsdom):
+
+```bash
+cd Frontend
+npm test          # single run   (npm run test:watch for watch mode)
+```
+
+16 tests covering the formatters, the API error extractor, the products query-param
+cleaner, and the `StockStatusBadge` component states.
+
+---
+
 ## Project structure
 
 ```

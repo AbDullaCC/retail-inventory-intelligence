@@ -21,7 +21,11 @@
       "Bash(curl -s -i -X OPTIONS http://127.0.0.1:8000/api/auth/login -H 'Origin: http://localhost:5173' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,authorization')",
       "Bash(curl -s -i -X POST http://127.0.0.1:8000/api/auth/login -H 'Origin: http://localhost:5173' -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{\"email\":\"demo@retail.test\",\"password\":\"password\"}')",
       "Bash(grep -rln \"function fillable\\\\|Attributes\\\\\\\\\\\\\\\\Fillable\\\\|class Fillable\" vendor/laravel/framework/src/Illuminate/Database/Eloquent/)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(npx vitest *)",
+      "PowerShell(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -ne $null } | Select-Object Name, @{n='UsedGB';e={[math]::Round\\($_.Used/1GB,1\\)}}, @{n='FreeGB';e={[math]::Round\\($_.Free/1GB,2\\)}} | Format-Table -AutoSize)",
+      "Bash(npm config *)",
+      "Bash(echo \"cache -> $\\(npm config get cache\\)\")"
     ]
   }
 }

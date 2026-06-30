@@ -24,7 +24,7 @@ export interface ProductPayload {
   quantity?: number
 }
 
-function cleanParams(filters: ProductFilters): Record<string, string | number> {
+export function cleanParams(filters: ProductFilters): Record<string, string | number> {
   const params: Record<string, string | number> = {}
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === '' || value === false) continue
