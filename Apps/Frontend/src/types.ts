@@ -82,6 +82,42 @@ export interface StockMovement {
   created_at: string | null
 }
 
+export type RecommendationType = 'reorder' | 'overstock' | 'healthy'
+
+export interface Recommendation {
+  product_id: number
+  sku: string
+  name: string
+  category_name: string | null
+  is_active: boolean
+  type: RecommendationType
+  current_stock: number
+  sales_velocity: number
+  days_of_stock_left: number | null
+  lead_time_days: number
+  lead_time_is_default: boolean
+  unit_cost: number
+  unit_cost_is_default: boolean
+  needs_reorder: boolean
+  suggested_reorder_qty: number
+  reorder_by_date: string | null
+  is_urgent: boolean
+  is_overstocked: boolean
+  cash_tied_up: number
+  reasoning: string
+}
+
+export interface RecommendationsSummary {
+  reorder_count: number
+  overstock_count: number
+  healthy_count: number
+  total_cash_tied_up: number
+  velocity_window_days: number
+  default_lead_time_days: number
+  generated_at: string
+  recommendations: Recommendation[]
+}
+
 export interface DashboardSummary {
   total_products: number
   active_products: number

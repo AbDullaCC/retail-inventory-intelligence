@@ -53,7 +53,12 @@ Backend/app/Modules/
 ├── Category/               # full CRUD vertical slice (+ Database/Migrations, Database/Factories)
 ├── Product/                # CRUD + filtering/pagination; delegates opening stock to the Stock module
 ├── Stock/                  # adjust / history / recent; Enums/StockMovementType, Exceptions/InsufficientStockException
-└── Dashboard/              # read-only aggregation across the other modules
+├── Dashboard/              # read-only aggregation across the other modules
+└── Intelligence/           # read-only analytics: reorder/overstock recommendations
+    ├── Services/           # ReorderCalculator (pure) + IntelligenceService (reads Product/Stock)
+    ├── Support/            # ReorderConfig (named, tunable constants)
+    ├── Console/            # `inventory:insights` table command
+    └── DTOs/Mappers/Controllers/Routes
 ```
 
 Modules are registered in `Backend/bootstrap/providers.php`. Each `*ServiceProvider`:
@@ -152,6 +157,8 @@ requires the header `Authorization: Bearer <token>`.
 | POST   | `/products/{id}/stock-adjustments`         | Adjust stock — `type` (`in`/`out`/`adjustment`), `quantity`, `reason` |
 | GET    | `/products/{id}/stock-movements`           | Paginated movement history           |
 | GET    | `/stock-movements?limit=N`                 | Recent movements across all products |
+| GET    | `/intelligence/recommendations`            | Reorder/overstock recommendations + aggregates |
+| GET    | `/products/{id}/recommendation`            | Recommendation for a single product  |
 
 ### Response envelope
 
@@ -182,6 +189,28 @@ requires the header `Authorization: Bearer <token>`.
 
 ---
 
+## Inventory intelligence
+
+The **Intelligence** module layers reorder/overstock guidance on top of the existing
+movement history — it adds **no new tables**. Per product it computes:
+
+- **salesVelocity** — `out` units over the last 14 days ÷ 14 (restocks/adjustments ignored).
+- **daysOfStockLeft** — `currentStock ÷ velocity` (null when there are no recent sales).
+- **needsReorder** — fewer days left than `leadTime + 3-day safety buffer`.
+- **suggestedReorderQty** — `ceil(velocity × (leadTime + 14-day coverage))`.
+- **reorderByDate** — when to order (or "today / urgent" if already too late).
+- **isOverstocked** — more than 60 days of stock on hand.
+- **cashTiedUp** — value of stock beyond 30 days of demand.
+
+Each product gets a `{ type: reorder | overstock | healthy, …metrics, reasoning }` object,
+plus an aggregate `{ reorderCount, overstockCount, totalCashTiedUp }`. The maths live in a
+pure, unit-tested `ReorderCalculator`; all thresholds are named constants in `ReorderConfig`.
+Because there is no supplier-lead-time field, **lead time defaults to 7 days** for every
+product; unit cost comes from `product.cost`. Run `php artisan inventory:insights` for a CLI
+table, or open the **Recommendations** page in the UI.
+
+---
+
 ## Testing
 
 **Backend** — PHPUnit, against an in-memory SQLite DB (configured in `phpunit.xml`):
@@ -191,10 +220,11 @@ cd Backend
 php artisan test
 ```
 
-54 tests covering: pure units (enum, `PaginatedData`, `ProductFilterData`, all mappers),
-service business logic (stock math, insufficient-stock & category-has-products rules,
-dashboard aggregation), and HTTP feature tests (auth + token revocation, products
-CRUD/validation/pagination, stock adjustments, category `409`).
+66 tests covering: pure units (enum, `PaginatedData`, `ProductFilterData`, all mappers,
+the `ReorderCalculator` incl. the zero-sales edge), service business logic (stock math,
+insufficient-stock & category-has-products rules, dashboard aggregation, velocity from
+movement history), and HTTP feature tests (auth + token revocation, products
+CRUD/validation/pagination, stock adjustments, category `409`, recommendation endpoints).
 
 **Frontend** — Vitest + Testing Library (jsdom):
 
@@ -203,8 +233,8 @@ cd Frontend
 npm test          # single run   (npm run test:watch for watch mode)
 ```
 
-16 tests covering the formatters, the API error extractor, the products query-param
-cleaner, and the `StockStatusBadge` component states.
+21 tests covering the formatters, the API error extractor, the products query-param
+cleaner, the `StockStatusBadge` component states, and the recommendation presentation helpers.
 
 ---
 

@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, LogOut, Package, Store, Tags } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, LogOut, Package, Store, Tags } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { cn } from './ui'
@@ -13,6 +13,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/products', label: 'Products', icon: Package },
+  { to: '/recommendations', label: 'Recommendations', icon: Lightbulb },
   { to: '/categories', label: 'Categories', icon: Tags },
 ]
 

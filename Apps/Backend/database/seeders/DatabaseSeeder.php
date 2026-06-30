@@ -6,11 +6,14 @@ namespace Database\Seeders;
 
 use App\Modules\Auth\Models\User;
 use App\Modules\Category\Models\Category;
+use App\Modules\Intelligence\Support\ReorderConfig;
 use App\Modules\Product\Models\Product;
 use App\Modules\Stock\DTOs\StockAdjustmentData;
 use App\Modules\Stock\Enums\StockMovementType;
+use App\Modules\Stock\Models\StockMovement;
 use App\Modules\Stock\Services\Contracts\StockServiceInterface;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 class DatabaseSeeder extends Seeder
 {
@@ -52,23 +55,61 @@ class DatabaseSeeder extends Seeder
                     continue;
                 }
 
-                if ($row['opening'] > 0) {
-                    $stock->adjust(
-                        $product->id,
-                        new StockAdjustmentData(StockMovementType::In, $row['opening'], 'Opening stock'),
-                        $user->id,
-                    );
-                }
-
-                if (($row['sold'] ?? 0) > 0) {
-                    $stock->adjust(
-                        $product->id,
-                        new StockAdjustmentData(StockMovementType::Out, $row['sold'], 'Customer sale'),
-                        $user->id,
-                    );
-                }
+                $this->recordHistory($stock, $product, (int) $row['opening'], (int) ($row['sold'] ?? 0), $user->id);
             }
         }
+    }
+
+    /**
+     * Build a realistic movement history: an opening restock just outside the
+     * velocity window, then daily customer sales spread across it. Spreading the
+     * sales (rather than one lump movement at seed time) is what lets the
+     * Intelligence module derive a meaningful per-day sales velocity.
+     */
+    private function recordHistory(StockServiceInterface $stock, Product $product, int $opening, int $sold, int $userId): void
+    {
+        $window = ReorderConfig::VELOCITY_WINDOW_DAYS;
+
+        if ($opening > 0) {
+            $dto = $stock->adjust(
+                $product->id,
+                new StockAdjustmentData(StockMovementType::In, $opening, 'Opening stock'),
+                $userId,
+            );
+            $this->backdate($dto->id, Carbon::now()->subDays($window + 2));
+        }
+
+        if ($sold <= 0) {
+            return;
+        }
+
+        // Distribute `sold` units evenly over the window (extra units land on the
+        // most recent days), so average velocity works out to sold / window.
+        $base = intdiv($sold, $window);
+        $remainder = $sold % $window;
+
+        // Oldest day first so the ledger's quantity_before/after stays monotonic.
+        for ($offset = $window - 1; $offset >= 0; $offset--) {
+            $qty = $base + ($offset < $remainder ? 1 : 0);
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $dto = $stock->adjust(
+                $product->id,
+                new StockAdjustmentData(StockMovementType::Out, $qty, 'Customer sale'),
+                $userId,
+            );
+            $this->backdate($dto->id, Carbon::now()->subDays($offset));
+        }
+    }
+
+    private function backdate(int $movementId, Carbon $when): void
+    {
+        StockMovement::query()->whereKey($movementId)->update([
+            'created_at' => $when,
+            'updated_at' => $when,
+        ]);
     }
 
     /**
@@ -103,6 +144,13 @@ class DatabaseSeeder extends Seeder
                 ['sku' => 'PER-001', 'name' => 'Toothpaste 100ml', 'price' => 2.10, 'cost' => 0.95, 'reorder' => 35, 'opening' => 90, 'sold' => 22],
                 ['sku' => 'PER-002', 'name' => 'Shampoo 400ml', 'price' => 4.60, 'cost' => 2.30, 'reorder' => 25, 'opening' => 55, 'sold' => 14],
                 ['sku' => 'PER-003', 'name' => 'Bar Soap 3-pack', 'price' => 2.80, 'cost' => 1.20, 'reorder' => 30, 'opening' => 75, 'sold' => 60],
+            ],
+            // Slow movers — deliberately overstocked / dormant so the intelligence
+            // layer surfaces overstock and "no recent sales" recommendations.
+            'Seasonal' => [
+                ['sku' => 'SEA-001', 'name' => 'Holiday Gift Box', 'price' => 12.00, 'cost' => 6.00, 'reorder' => 20, 'opening' => 200, 'sold' => 14, 'description' => 'Boxed seasonal gift set — slow off-season.'],
+                ['sku' => 'SEA-002', 'name' => 'Beach Umbrella', 'price' => 18.00, 'cost' => 9.00, 'reorder' => 10, 'opening' => 120, 'sold' => 7, 'description' => 'Large parasol — out of season.'],
+                ['sku' => 'SEA-003', 'name' => 'Display Stand', 'price' => 7.50, 'cost' => 5.00, 'reorder' => 5, 'opening' => 40, 'sold' => 0, 'description' => 'Promotional display unit — no recent sales.'],
             ],
         ];
     }

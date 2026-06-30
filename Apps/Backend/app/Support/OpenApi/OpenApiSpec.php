@@ -33,6 +33,7 @@ final class OpenApiSpec
                 ['name' => 'Categories', 'description' => 'Product categories.'],
                 ['name' => 'Products', 'description' => 'Catalogue and stock levels.'],
                 ['name' => 'Stock', 'description' => 'Stock movements (the inventory ledger).'],
+                ['name' => 'Intelligence', 'description' => 'Reorder & overstock recommendations derived from sales history.'],
             ],
             'security' => [['bearerAuth' => []]],
             'paths' => self::paths(),
@@ -103,6 +104,24 @@ final class OpenApiSpec
                     'tags' => ['Dashboard'],
                     'summary' => 'Inventory KPIs and recent activity',
                     'responses' => ['200' => self::dataResponse('DashboardSummary'), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+
+            '/api/intelligence/recommendations' => [
+                'get' => [
+                    'tags' => ['Intelligence'],
+                    'summary' => 'Reorder & overstock recommendations for every product',
+                    'description' => 'Sales velocity is averaged over the last 14 days of `out` movements. '
+                        .'Lead time is defaulted to 7 days (no per-product lead-time field) and unit cost comes from `product.cost`.',
+                    'responses' => ['200' => self::dataResponse('RecommendationsSummary'), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+            '/api/products/{product}/recommendation' => [
+                'parameters' => [self::idParam('product')],
+                'get' => [
+                    'tags' => ['Intelligence'],
+                    'summary' => 'Recommendation for a single product',
+                    'responses' => ['200' => self::dataResponse('Recommendation'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
                 ],
             ],
 
@@ -470,6 +489,45 @@ final class OpenApiSpec
                     'total_stock_value' => ['type' => 'number', 'format' => 'float'],
                     'low_stock_products' => ['type' => 'array', 'items' => self::schemaRef('Product')],
                     'recent_movements' => ['type' => 'array', 'items' => self::schemaRef('StockMovement')],
+                ],
+            ],
+
+            'Recommendation' => [
+                'type' => 'object',
+                'properties' => [
+                    'product_id' => ['type' => 'integer'],
+                    'sku' => ['type' => 'string'],
+                    'name' => ['type' => 'string'],
+                    'category_name' => ['type' => 'string', 'nullable' => true],
+                    'is_active' => ['type' => 'boolean'],
+                    'type' => ['type' => 'string', 'enum' => ['reorder', 'overstock', 'healthy']],
+                    'current_stock' => ['type' => 'integer'],
+                    'sales_velocity' => ['type' => 'number', 'format' => 'float', 'description' => 'Average units sold per day over the velocity window.'],
+                    'days_of_stock_left' => ['type' => 'number', 'format' => 'float', 'nullable' => true, 'description' => 'Null when there are no recent sales.'],
+                    'lead_time_days' => ['type' => 'integer'],
+                    'lead_time_is_default' => ['type' => 'boolean'],
+                    'unit_cost' => ['type' => 'number', 'format' => 'float'],
+                    'unit_cost_is_default' => ['type' => 'boolean'],
+                    'needs_reorder' => ['type' => 'boolean'],
+                    'suggested_reorder_qty' => ['type' => 'integer'],
+                    'reorder_by_date' => ['type' => 'string', 'format' => 'date', 'nullable' => true],
+                    'is_urgent' => ['type' => 'boolean'],
+                    'is_overstocked' => ['type' => 'boolean'],
+                    'cash_tied_up' => ['type' => 'number', 'format' => 'float'],
+                    'reasoning' => ['type' => 'string'],
+                ],
+            ],
+            'RecommendationsSummary' => [
+                'type' => 'object',
+                'properties' => [
+                    'reorder_count' => ['type' => 'integer'],
+                    'overstock_count' => ['type' => 'integer'],
+                    'healthy_count' => ['type' => 'integer'],
+                    'total_cash_tied_up' => ['type' => 'number', 'format' => 'float'],
+                    'velocity_window_days' => ['type' => 'integer'],
+                    'default_lead_time_days' => ['type' => 'integer'],
+                    'generated_at' => ['type' => 'string', 'format' => 'date-time'],
+                    'recommendations' => ['type' => 'array', 'items' => self::schemaRef('Recommendation')],
                 ],
             ],
 

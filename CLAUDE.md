@@ -47,7 +47,7 @@ Controller (thin: validate via FormRequest, build input DTO, return DTO)
     → returns a DTO (immutable, extends Shared\DTOs\BaseData, serialised to JSON)
 ```
 
-A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Services/` (+ `Services/Contracts/`), `DTOs/`, `Mappers/`, `Models/`, `Providers/`, `Routes/api.php`, and (where it has tables) `Database/Migrations/` + `Database/Factories/`. Modules: `Shared`, `Auth`, `Category`, `Product`, `Stock`, `Dashboard`.
+A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Services/` (+ `Services/Contracts/`), `DTOs/`, `Mappers/`, `Models/`, `Providers/`, `Routes/api.php`, and (where it has tables) `Database/Migrations/` + `Database/Factories/`. Modules: `Shared`, `Auth`, `Category`, `Product`, `Stock`, `Dashboard`, `Intelligence`.
 
 ### How modules are wired (read these to understand the big picture)
 
@@ -62,6 +62,7 @@ A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Servi
 - **Stock is the single source of truth for on-hand quantity.** Product attributes (`ProductService`) and stock (`StockService`) are separate: `ProductData` deliberately has **no `quantity`** field. All quantity changes go through `StockService::adjust`, which runs in a `DB::transaction` with `lockForUpdate`, writes an immutable `stock_movements` ledger row (`quantity_before`/`quantity_after`), and rejects going below zero.
 - `ProductService::create` with an opening quantity **delegates to `StockService`** to record an opening movement (Product module depends on Stock module; no container cycle because `StockService` only uses the Product *model*, not `ProductService`).
 - The `User` model lives in **`Auth/Models/User.php`** (not `app/Models`); `config/auth.php` points there.
+- **The `Intelligence` module is read-only analytics** layered on existing data — it owns **no tables/models**. `ReorderCalculator` (in `Intelligence/Services/`) is a **pure, framework-free** function of `(snapshot, ReorderConfig)` — unit-tested in isolation — while `IntelligenceService` reads `Product` + `StockMovement` and feeds it. Sales velocity = sum of **`out`** movement quantities over the last `VELOCITY_WINDOW_DAYS`, divided by the window (`in`/`adjustment` ignored). There is **no supplier-lead-time field**, so lead time is always defaulted (`ReorderConfig::DEFAULT_LEAD_TIME_DAYS = 7`); unit cost is `product.cost` with a null fallback. All tunables are named constants on `Intelligence/Support/ReorderConfig.php`. `php artisan inventory:insights` prints the per-product table. **Intermediate maths are never rounded — rounding is display-only** (the reasoning strings and the frontend).
 
 ### Conventions
 

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Lightbulb } from 'lucide-react'
 import { productsApi } from '../api/products'
 import { stockApi } from '../api/stock'
+import { intelligenceApi } from '../api/intelligence'
 import { apiErrorMessage } from '../lib/api'
+import { perWeek, recommendationPresentation, reorderByLabel } from '../lib/recommendation'
 import {
   Badge,
   Button,
@@ -19,13 +21,24 @@ import {
 } from '../components/ui'
 import { StockStatusBadge } from '../components/StockStatusBadge'
 import { formatCurrency, formatDateTime, formatNumber } from '../lib/format'
-import type { ApiPaginated, Product, StockMovement, StockMovementType } from '../types'
+import type { ApiPaginated, Product, Recommendation, StockMovement, StockMovementType } from '../types'
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between py-2">
       <span className="text-sm text-slate-500">{label}</span>
       <span className="text-sm font-medium text-slate-800">{value}</span>
+    </div>
+  )
+}
+
+function Metric({ label, value, urgent }: { label: string; value: string; urgent?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={urgent ? 'text-sm font-semibold text-red-600' : 'text-sm font-semibold text-slate-800'}>
+        {value}
+      </p>
     </div>
   )
 }
@@ -48,6 +61,7 @@ export function ProductDetailPage() {
 
   const [product, setProduct] = useState<Product | null>(null)
   const [history, setHistory] = useState<ApiPaginated<StockMovement> | null>(null)
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [type, setType] = useState<StockMovementType>('in')
@@ -68,6 +82,10 @@ export function ProductDetailPage() {
     [productId],
   )
 
+  const loadRecommendation = useCallback(() => {
+    return intelligenceApi.forProduct(productId).then(setRecommendation)
+  }, [productId])
+
   useEffect(() => {
     if (Number.isNaN(productId)) {
       setLoading(false)
@@ -76,7 +94,9 @@ export function ProductDetailPage() {
     Promise.all([loadProduct(), loadHistory(1)])
       .catch((error) => toast.error(apiErrorMessage(error)))
       .finally(() => setLoading(false))
-  }, [productId, loadProduct, loadHistory])
+    // Recommendation is supplementary — don't block or blank the page if it fails.
+    loadRecommendation().catch(() => undefined)
+  }, [productId, loadProduct, loadHistory, loadRecommendation])
 
   const onAdjust = async (e: FormEvent) => {
     e.preventDefault()
@@ -90,7 +110,7 @@ export function ProductDetailPage() {
       toast.success('Stock updated.')
       setQuantity(type === 'adjustment' ? quantity : '1')
       setReason('')
-      await Promise.all([loadProduct(), loadHistory(1)])
+      await Promise.all([loadProduct(), loadHistory(1), loadRecommendation()])
     } catch (error) {
       toast.error(apiErrorMessage(error))
     } finally {
@@ -132,6 +152,40 @@ export function ProductDetailPage() {
         </div>
         <StockStatusBadge product={product} />
       </div>
+
+      {recommendation && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-indigo-500" />
+              <h2 className="font-semibold text-slate-900">Recommendation</h2>
+            </div>
+            <Badge tone={recommendationPresentation(recommendation.type).tone}>
+              {recommendationPresentation(recommendation.type).label}
+            </Badge>
+          </div>
+          <p className="mt-2 text-sm text-slate-600">{recommendation.reasoning}</p>
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Metric label="Sales / week" value={`${perWeek(recommendation.sales_velocity)} units`} />
+            <Metric
+              label="Days of cover"
+              value={
+                recommendation.days_of_stock_left === null
+                  ? 'No recent sales'
+                  : `${Math.round(recommendation.days_of_stock_left)} days`
+              }
+            />
+            {recommendation.needs_reorder ? (
+              <>
+                <Metric label="Suggested order" value={`${formatNumber(recommendation.suggested_reorder_qty)} units`} />
+                <Metric label="Order by" value={reorderByLabel(recommendation)} urgent={recommendation.is_urgent} />
+              </>
+            ) : (
+              <Metric label="Cash tied up" value={formatCurrency(recommendation.cash_tied_up)} />
+            )}
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Details */}

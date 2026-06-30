@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { CategoriesPage } from './pages/CategoriesPage'
+import { RecommendationsPage } from './pages/RecommendationsPage'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/:id" element={<ProductDetailPage />} />
+              <Route path="/recommendations" element={<RecommendationsPage />} />
               <Route path="/categories" element={<CategoriesPage />} />
             </Route>
           </Route>

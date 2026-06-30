@@ -28,7 +28,19 @@
       "Bash(echo \"cache -> $\\(npm config get cache\\)\")",
       "Bash(curl -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://127.0.0.1:8000/docs/openapi.json)",
       "Bash(curl -s http://127.0.0.1:8000/docs/openapi.json)",
-      "Bash(curl -s http://127.0.0.1:8000/docs)"
+      "Bash(curl -s http://127.0.0.1:8000/docs)",
+      "PowerShell($mysql = Get-Process mysqld -ErrorAction SilentlyContinue; if \\($mysql\\) { \"MySQL running \\(PID $\\($mysql.Id\\)\\)\" } else { \"MySQL NOT running\" })",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan serve)",
+      "Bash(curl -s http://127.0.0.1:8000/api/ping)",
+      "Bash(curl -s -o /dev/null -w \"frontend HTTP %{http_code}\\\\n\" http://localhost:5173/)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan test --filter=Intelligence 2>&1 | Select-Object -Last 60)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan test --filter=Intelligence 2>&1 | Select-Object -Last 30)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan test --filter=Intelligence 2>&1 | Select-Object -Last 15)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan migrate:fresh --seed 2>&1 | Select-Object -Last 8)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan inventory:insights)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; ./vendor/bin/pint app/Modules/Intelligence database/seeders tests/Unit/Intelligence tests/Feature/Intelligence app/Support/OpenApi 2>&1 | Select-Object -Last 20)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan test 2>&1 | Select-Object -Last 20)",
+      "PowerShell($env:Path = \"C:\\\\xampp\\\\php;\" + $env:Path; Set-Location \"D:\\\\GitHub\\\\retail-inventory-intelligence\\\\Apps\\\\Backend\"; php artisan tinker --execute=\"`$s = App\\\\Support\\\\OpenApi\\\\OpenApiSpec::build\\('http://127.0.0.1:8000'\\); `$j = json_encode\\(`$s\\); echo 'paths=' . count\\(`$s['paths']\\) . ' schemas=' . count\\(`$s['components']['schemas']\\) . ' json_ok=' . \\(`$j !== false ? 'yes' : 'no'\\);\")"
     ]
   }
 }
