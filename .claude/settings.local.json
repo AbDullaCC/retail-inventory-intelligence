@@ -75,7 +75,8 @@
       "Bash(python -m pip install --quiet defusedxml)",
       "Bash(py -3.12 -m pip install --quiet defusedxml)",
       "Bash(py -3.12 \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")",
-      "Bash(PYTHONIOENCODING=utf-8 py -3.12 \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")"
+      "Bash(PYTHONIOENCODING=utf-8 py -3.12 \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")",
+      "Bash(py -3.12 -c ' *)"
     ]
   }
 }
