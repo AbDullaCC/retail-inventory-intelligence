@@ -100,7 +100,7 @@ No single model fits a retail catalogue — a daily best-seller, a product selli
 | Demand pattern | Model | Why this model | Products |
 |---|---|---|---|
 | Steady seller, 2+ years of history | **MSTL** (weekly + annual seasonality) | The only model in the set that learns weekly *and* yearly cycles; it must see the annual cycle twice — which our 2-year dataset provides. This is what lets the system anticipate seasonal ramps | 95 |
-| Steady seller | **AutoETS** (weekly seasonality) | Exponential smoothing that self-tunes per product and weights recent sales more; the model family that topped the M5 forecasting competition (run on Walmart data) | 126 |
+| Steady seller | **AutoETS** (weekly seasonality) | Exponential smoothing that self-tunes per product and weights recent sales more. In the M5 competition (on Walmart data) it stayed competitive as a per-SKU benchmark — the overall winners were gradient-boosting methods, but simple exponential smoothing remained strong at product level, which is exactly this use case. Fast and self-tuning across many series | 126 |
 | Sparse but alive | **CrostonOptimized** | The industry standard for intermittent demand: forecasts a demand *rate* by smoothing order sizes and gaps separately — exactly what a reorder decision needs when no model can know *which* day the next sale lands | 28 |
 | Dying demand | **TSB** | Its sale-probability decays toward zero when a product stops selling — this powers **dead-stock detection** | 1 |
 | Under 28 days of history | SeasonalNaive / Naive | Honest baselines for new products | — |
