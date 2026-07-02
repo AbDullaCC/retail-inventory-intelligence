@@ -82,7 +82,11 @@ export interface StockMovement {
   created_at: string | null
 }
 
-export type RecommendationType = 'reorder' | 'overstock' | 'healthy'
+export type RecommendationType = 'reorder' | 'overstock' | 'healthy' | 'dead_stock'
+
+export type ForecastSource = 'model' | 'fallback'
+
+export type StockoutRisk = 'high' | 'medium' | 'low'
 
 export interface Recommendation {
   product_id: number
@@ -105,17 +109,87 @@ export interface Recommendation {
   is_overstocked: boolean
   cash_tied_up: number
   reasoning: string
+  forecast_source: ForecastSource
+  model_used: string | null
+  forecast_generated_at: string | null
+  projected_stockout_date: string | null
+  stockout_risk: StockoutRisk | null
+  demand_trend_pct: number | null
+  projected_units_30d: number | null
+  projected_revenue_30d: number | null
 }
 
 export interface RecommendationsSummary {
   reorder_count: number
   overstock_count: number
   healthy_count: number
+  dead_stock_count: number
+  dead_stock_cash_recoverable: number
+  forecasted_count: number
+  projected_revenue_30d: number | null
   total_cash_tied_up: number
   velocity_window_days: number
   default_lead_time_days: number
   generated_at: string
   recommendations: Recommendation[]
+}
+
+export interface DemandHistoryPoint {
+  date: string
+  qty: number
+}
+
+export interface ForecastPoint {
+  date: string
+  mean: number
+  lo_90: number | null
+  hi_90: number | null
+}
+
+export interface ProductForecast {
+  product_id: number
+  sku: string
+  name: string
+  generated_at: string | null
+  model_used: string | null
+  horizon_days: number | null
+  history: DemandHistoryPoint[]
+  forecast: ForecastPoint[]
+}
+
+export interface ForecastSummaryDaily {
+  date: string
+  mean: number
+  hi_90: number
+}
+
+export interface ForecastSummary {
+  forecasted_count: number
+  projected_units_30d: number
+  projected_revenue_30d: number
+  model_mix: Record<string, number>
+  generated_at: string | null
+  daily: ForecastSummaryDaily[]
+}
+
+export interface MovementTrendPoint {
+  date: string
+  units_in: number
+  units_out: number
+  movements: number
+}
+
+export interface CategoryValue {
+  category_id: number
+  category_name: string
+  stock_value: number
+  units: number
+}
+
+export interface DashboardTrends {
+  days: number
+  series: MovementTrendPoint[]
+  category_values: CategoryValue[]
 }
 
 export interface DashboardSummary {

@@ -24,6 +24,10 @@ final class RecommendationsSummaryDTO extends BaseData
         public readonly int $defaultLeadTimeDays,
         public readonly string $generatedAt,
         public readonly array $recommendations,
+        public readonly int $deadStockCount = 0,
+        public readonly float $deadStockCashRecoverable = 0.0,
+        public readonly int $forecastedCount = 0,
+        public readonly ?float $projectedRevenue30d = null,
     ) {}
 
     public function toArray(): array
@@ -32,6 +36,10 @@ final class RecommendationsSummaryDTO extends BaseData
             'reorder_count' => $this->reorderCount,
             'overstock_count' => $this->overstockCount,
             'healthy_count' => $this->healthyCount,
+            'dead_stock_count' => $this->deadStockCount,
+            'dead_stock_cash_recoverable' => $this->deadStockCashRecoverable,
+            'forecasted_count' => $this->forecastedCount,
+            'projected_revenue_30d' => $this->projectedRevenue30d,
             'total_cash_tied_up' => $this->totalCashTiedUp,
             'velocity_window_days' => $this->velocityWindowDays,
             'default_lead_time_days' => $this->defaultLeadTimeDays,

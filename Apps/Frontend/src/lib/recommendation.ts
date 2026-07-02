@@ -14,6 +14,8 @@ export function recommendationPresentation(type: RecommendationType): Recommenda
       return { label: 'Reorder', tone: 'red' }
     case 'overstock':
       return { label: 'Overstock', tone: 'amber' }
+    case 'dead_stock':
+      return { label: 'Dead stock', tone: 'gray' }
     default:
       return { label: 'Healthy', tone: 'green' }
   }

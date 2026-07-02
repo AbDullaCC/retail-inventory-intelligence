@@ -34,6 +34,7 @@ final class OpenApiSpec
                 ['name' => 'Products', 'description' => 'Catalogue and stock levels.'],
                 ['name' => 'Stock', 'description' => 'Stock movements (the inventory ledger).'],
                 ['name' => 'Intelligence', 'description' => 'Reorder & overstock recommendations derived from sales history.'],
+                ['name' => 'Forecast', 'description' => 'Time-series demand forecasts (statsforecast sidecar) for charting.'],
             ],
             'security' => [['bearerAuth' => []]],
             'paths' => self::paths(),
@@ -106,12 +107,26 @@ final class OpenApiSpec
                     'responses' => ['200' => self::dataResponse('DashboardSummary'), '401' => self::ref('Unauthorized')],
                 ],
             ],
+            '/api/dashboard/trends' => [
+                'get' => [
+                    'tags' => ['Dashboard'],
+                    'summary' => 'Daily movement totals for charting',
+                    'description' => 'Zero-filled per-day in/out unit totals over the trailing window, plus stock value by category. Pass `product_id` to narrow the series to one product (the category breakdown is then empty).',
+                    'parameters' => [
+                        ['name' => 'days', 'in' => 'query', 'schema' => ['type' => 'integer', 'minimum' => 7, 'maximum' => 90, 'default' => 30]],
+                        ['name' => 'product_id', 'in' => 'query', 'schema' => ['type' => 'integer']],
+                    ],
+                    'responses' => ['200' => self::dataResponse('DashboardTrends'), '401' => self::ref('Unauthorized'), '422' => self::ref('ValidationError')],
+                ],
+            ],
 
             '/api/intelligence/recommendations' => [
                 'get' => [
                     'tags' => ['Intelligence'],
                     'summary' => 'Reorder & overstock recommendations for every product',
-                    'description' => 'Sales velocity is averaged over the last 14 days of `out` movements. '
+                    'description' => 'Demand comes from the per-product time-series model forecast when a fresh one exists '
+                        .'(`forecast_source: model` — see `POST forecast:run` and the Forecast endpoints); otherwise sales velocity '
+                        .'falls back to the average over the last 14 days of `out` movements (`forecast_source: fallback`). '
                         .'Lead time is defaulted to 7 days (no per-product lead-time field) and unit cost comes from `product.cost`.',
                     'responses' => ['200' => self::dataResponse('RecommendationsSummary'), '401' => self::ref('Unauthorized')],
                 ],
@@ -122,6 +137,24 @@ final class OpenApiSpec
                     'tags' => ['Intelligence'],
                     'summary' => 'Recommendation for a single product',
                     'responses' => ['200' => self::dataResponse('Recommendation'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
+                ],
+            ],
+            '/api/forecast/summary' => [
+                'get' => [
+                    'tags' => ['Forecast'],
+                    'summary' => 'Store-wide demand projection',
+                    'description' => 'Every fresh product forecast aggregated per day (expected + p90 demand), with projected 30-day units/revenue and the model mix.',
+                    'responses' => ['200' => self::dataResponse('ForecastSummary'), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+            '/api/products/{product}/forecast' => [
+                'parameters' => [self::idParam('product')],
+                'get' => [
+                    'tags' => ['Forecast'],
+                    'summary' => 'Daily sales history + model forecast for charting',
+                    'description' => 'Last 90 days of zero-filled daily sales plus the stored forecast horizon with p90 bands. '
+                        .'`forecast` is empty (and the model fields null) when no fresh forecast exists — run `php artisan forecast:run`.',
+                    'responses' => ['200' => self::dataResponse('ProductForecast'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
                 ],
             ],
 
@@ -492,6 +525,25 @@ final class OpenApiSpec
                 ],
             ],
 
+            'DashboardTrends' => [
+                'type' => 'object',
+                'properties' => [
+                    'days' => ['type' => 'integer'],
+                    'series' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                        'date' => ['type' => 'string', 'format' => 'date'],
+                        'units_in' => ['type' => 'integer'],
+                        'units_out' => ['type' => 'integer'],
+                        'movements' => ['type' => 'integer'],
+                    ]]],
+                    'category_values' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                        'category_id' => ['type' => 'integer'],
+                        'category_name' => ['type' => 'string'],
+                        'stock_value' => ['type' => 'number', 'format' => 'float'],
+                        'units' => ['type' => 'integer'],
+                    ]]],
+                ],
+            ],
+
             'Recommendation' => [
                 'type' => 'object',
                 'properties' => [
@@ -515,6 +567,14 @@ final class OpenApiSpec
                     'is_overstocked' => ['type' => 'boolean'],
                     'cash_tied_up' => ['type' => 'number', 'format' => 'float'],
                     'reasoning' => ['type' => 'string'],
+                    'forecast_source' => ['type' => 'string', 'enum' => ['model', 'fallback'], 'description' => 'Whether the demand estimate came from the time-series model or the window-average fallback.'],
+                    'model_used' => ['type' => 'string', 'nullable' => true, 'description' => 'Forecasting model (AutoETS, MSTL, CrostonOptimized, TSB, SeasonalNaive, Naive); null on fallback.'],
+                    'forecast_generated_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    'projected_stockout_date' => ['type' => 'string', 'format' => 'date', 'nullable' => true, 'description' => 'First day cumulative forecast demand exhausts on-hand stock; null when stock outlasts the horizon (or on fallback).'],
+                    'stockout_risk' => ['type' => 'string', 'enum' => ['high', 'medium', 'low'], 'nullable' => true, 'description' => 'high: expected lead-time demand exhausts stock; medium: the p90 worst case does; low: covered.'],
+                    'demand_trend_pct' => ['type' => 'number', 'format' => 'float', 'nullable' => true, 'description' => 'Expected next-28-day demand vs the previous 28 days of actuals, in percent.'],
+                    'projected_units_30d' => ['type' => 'number', 'format' => 'float', 'nullable' => true],
+                    'projected_revenue_30d' => ['type' => 'number', 'format' => 'float', 'nullable' => true],
                 ],
             ],
             'RecommendationsSummary' => [
@@ -523,11 +583,55 @@ final class OpenApiSpec
                     'reorder_count' => ['type' => 'integer'],
                     'overstock_count' => ['type' => 'integer'],
                     'healthy_count' => ['type' => 'integer'],
+                    'dead_stock_count' => ['type' => 'integer', 'description' => 'Products the model expects no further demand for while stock remains.'],
+                    'dead_stock_cash_recoverable' => ['type' => 'number', 'format' => 'float'],
+                    'forecasted_count' => ['type' => 'integer', 'description' => 'Products whose recommendation used a fresh model forecast.'],
+                    'projected_revenue_30d' => ['type' => 'number', 'format' => 'float', 'nullable' => true, 'description' => 'Store-wide expected revenue over the next 30 days; null when nothing is forecasted.'],
                     'total_cash_tied_up' => ['type' => 'number', 'format' => 'float'],
                     'velocity_window_days' => ['type' => 'integer'],
                     'default_lead_time_days' => ['type' => 'integer'],
                     'generated_at' => ['type' => 'string', 'format' => 'date-time'],
                     'recommendations' => ['type' => 'array', 'items' => self::schemaRef('Recommendation')],
+                ],
+            ],
+            'ForecastPoint' => [
+                'type' => 'object',
+                'properties' => [
+                    'date' => ['type' => 'string', 'format' => 'date'],
+                    'mean' => ['type' => 'number', 'format' => 'float'],
+                    'lo_90' => ['type' => 'number', 'format' => 'float', 'nullable' => true, 'description' => 'Null for models without prediction intervals (Croston/TSB).'],
+                    'hi_90' => ['type' => 'number', 'format' => 'float', 'nullable' => true],
+                ],
+            ],
+            'ForecastSummary' => [
+                'type' => 'object',
+                'properties' => [
+                    'forecasted_count' => ['type' => 'integer'],
+                    'projected_units_30d' => ['type' => 'number', 'format' => 'float'],
+                    'projected_revenue_30d' => ['type' => 'number', 'format' => 'float'],
+                    'model_mix' => ['type' => 'object', 'additionalProperties' => ['type' => 'integer'], 'description' => 'Model name → product count.'],
+                    'generated_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    'daily' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                        'date' => ['type' => 'string', 'format' => 'date'],
+                        'mean' => ['type' => 'number', 'format' => 'float'],
+                        'hi_90' => ['type' => 'number', 'format' => 'float'],
+                    ]]],
+                ],
+            ],
+            'ProductForecast' => [
+                'type' => 'object',
+                'properties' => [
+                    'product_id' => ['type' => 'integer'],
+                    'sku' => ['type' => 'string'],
+                    'name' => ['type' => 'string'],
+                    'generated_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    'model_used' => ['type' => 'string', 'nullable' => true],
+                    'horizon_days' => ['type' => 'integer', 'nullable' => true],
+                    'history' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                        'date' => ['type' => 'string', 'format' => 'date'],
+                        'qty' => ['type' => 'integer'],
+                    ]]],
+                    'forecast' => ['type' => 'array', 'items' => self::schemaRef('ForecastPoint')],
                 ],
             ],
 

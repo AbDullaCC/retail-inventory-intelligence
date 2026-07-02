@@ -1,7 +1,62 @@
-@import "tailwindcss";
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import 'tailwindcss';
+
+/*
+ * Design tokens — "Harbor" deep teal on white.
+ * The brand scale replaces default indigo everywhere; semantic status scales
+ * are deliberately distinct from the brand (success is green-600, never teal).
+ */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', monospace;
+
+  --color-brand-50: #f0faf9;
+  --color-brand-100: #d3f1ee;
+  --color-brand-200: #a7e2dc;
+  --color-brand-300: #6fcbc4;
+  --color-brand-400: #3daca6;
+  --color-brand-500: #1d8f8a;
+  --color-brand-600: #0f7470;
+  --color-brand-700: #0e5f5c;
+  --color-brand-800: #114c4a;
+  --color-brand-900: #113f3e;
+  --color-brand-950: #052827;
+
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  --color-info-50: #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-600: #0284c7;
+  --color-info-700: #0369a1;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.05);
+  --shadow-pop: 0 10px 30px -6px rgb(15 23 42 / 0.15), 0 4px 10px -4px rgb(15 23 42 / 0.08);
+
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+}
 
 :root {
   color-scheme: light;
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 html,
@@ -12,6 +67,14 @@ body,
 
 body {
   margin: 0;
-  background-color: #f1f5f9;
-  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-brand-100);
 }

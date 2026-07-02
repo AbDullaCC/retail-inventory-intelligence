@@ -4,25 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A retail **inventory management** MVP split into two apps under `Apps/`:
+A retail **inventory intelligence** MVP ("Shelfwise") split into three apps under `Apps/`:
 
 - `Apps/Backend` — Laravel 13 REST API (PHP 8.4), Sanctum bearer-token auth, MySQL/MariaDB.
 - `Apps/Frontend` — React 19 + TypeScript + Vite + Tailwind CSS v4 SPA, consuming the API.
+- `Apps/Forecast` — Python 3.12 FastAPI sidecar running Nixtla `statsforecast` models; **stateless** (Laravel sends daily series, sidecar returns forecasts — no DB access from Python).
 
 The backend is a **modular monolith**: business capabilities are independent modules under `Apps/Backend/app/Modules/<Module>/`, each owning a full vertical slice of layers.
 
 ## Commands
 
-All backend commands run from `Apps/Backend`, frontend from `Apps/Frontend`.
+All backend commands run from `Apps/Backend`, frontend from `Apps/Frontend`, sidecar from `Apps/Forecast`.
 
 ```bash
 # Backend
 php artisan serve                                   # http://127.0.0.1:8000
-php artisan migrate --seed                          # migrate + seed demo catalogue
+php artisan migrate --seed                          # migrate + seed small demo catalogue
+php artisan inventory:import-retail                 # import real 2-year retail history (needs the
+                                                    #   UCI Online Retail II xlsx in storage/app/private/datasets;
+                                                    #   --fresh truncates catalogue tables first; ~10-15 min)
+php artisan forecast:run                            # refresh per-product forecasts (sidecar must be running)
+php artisan forecast:evaluate                       # holdout backtest: model WAPE vs legacy 14d-average
+php artisan inventory:insights                      # per-product verdict table (model column included)
 php artisan test                                    # full suite (PHPUnit, in-memory SQLite)
 php artisan test --filter=test_stock_in_increases   # single test by method name
 php artisan test tests/Feature/Stock/StockServiceTest.php  # single file
 ./vendor/bin/pint                                   # format (Laravel Pint)
+
+# Forecast sidecar (Python 3.11/3.12; venv at Apps/Forecast/.venv)
+.venv\Scripts\activate && uvicorn app.main:app --host 127.0.0.1 --port 8100
+pytest                                              # sidecar tests (classification + API contract)
 
 # Frontend
 npm run dev          # http://localhost:5173
@@ -47,7 +58,7 @@ Controller (thin: validate via FormRequest, build input DTO, return DTO)
     → returns a DTO (immutable, extends Shared\DTOs\BaseData, serialised to JSON)
 ```
 
-A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Services/` (+ `Services/Contracts/`), `DTOs/`, `Mappers/`, `Models/`, `Providers/`, `Routes/api.php`, and (where it has tables) `Database/Migrations/` + `Database/Factories/`. Modules: `Shared`, `Auth`, `Category`, `Product`, `Stock`, `Dashboard`, `Intelligence`.
+A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Services/` (+ `Services/Contracts/`), `DTOs/`, `Mappers/`, `Models/`, `Providers/`, `Routes/api.php`, and (where it has tables) `Database/Migrations/` + `Database/Factories/`. Modules: `Shared`, `Auth`, `Category`, `Product`, `Stock`, `Dashboard`, `Forecast`, `Intelligence`.
 
 ### How modules are wired (read these to understand the big picture)
 
@@ -62,7 +73,9 @@ A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Servi
 - **Stock is the single source of truth for on-hand quantity.** Product attributes (`ProductService`) and stock (`StockService`) are separate: `ProductData` deliberately has **no `quantity`** field. All quantity changes go through `StockService::adjust`, which runs in a `DB::transaction` with `lockForUpdate`, writes an immutable `stock_movements` ledger row (`quantity_before`/`quantity_after`), and rejects going below zero.
 - `ProductService::create` with an opening quantity **delegates to `StockService`** to record an opening movement (Product module depends on Stock module; no container cycle because `StockService` only uses the Product *model*, not `ProductService`).
 - The `User` model lives in **`Auth/Models/User.php`** (not `app/Models`); `config/auth.php` points there.
-- **The `Intelligence` module is read-only analytics** layered on existing data — it owns **no tables/models**. `ReorderCalculator` (in `Intelligence/Services/`) is a **pure, framework-free** function of `(snapshot, ReorderConfig)` — unit-tested in isolation — while `IntelligenceService` reads `Product` + `StockMovement` and feeds it. Sales velocity = sum of **`out`** movement quantities over the last `VELOCITY_WINDOW_DAYS`, divided by the window (`in`/`adjustment` ignored). There is **no supplier-lead-time field**, so lead time is always defaulted (`ReorderConfig::DEFAULT_LEAD_TIME_DAYS = 7`); unit cost is `product.cost` with a null fallback. All tunables are named constants on `Intelligence/Support/ReorderConfig.php`. `php artisan inventory:insights` prints the per-product table. **Intermediate maths are never rounded — rounding is display-only** (the reasoning strings and the frontend).
+- **The `Forecast` module owns forecasting state**: the `product_forecasts` table (one row per product, replaced on each `forecast:run`), `DemandSeriesBuilder` (zero-filled daily `out` series from the ledger — the only ledger→calendar translation), `ForecastRunner` (chunked HTTP to the sidecar via `config/services.php` `forecast` block, env `FORECAST_SERVICE_URL`) and `ForecastReader` (**staleness policy lives here alone**: rows older than 48h are treated as absent). The sidecar contract and model-selection rules (Syntetos–Boylan + MSTL tier for 730+ days of history; Croston vs TSB split on a dying-tail heuristic) are documented in `Apps/Forecast/README.md`. Graceful degradation is a hard requirement: sidecar down or stale forecasts → everything falls back to the window-average formula.
+- **The `Intelligence` module is read-only analytics** — it owns **no tables/models**; it reads forecasts through `ForecastReaderInterface` (cross-module dependency mirroring Product→Stock). `ReorderCalculator` (in `Intelligence/Services/`) is a **pure, framework-free** function of `(snapshot, ReorderConfig, ?ForecastSnapshot)` — snapshots are passed in, never fetched. With a snapshot: velocity = the model's expected daily demand, suggested qty = forecast demand over lead+coverage plus a p90-gap safety buffer, and the forecast-only fields light up (`projected_stockout_date`, `stockout_risk`, `demand_trend_pct`, `projected_*_30d`, and the fourth verdict `dead_stock`). Without one (fallback): sales velocity = sum of **`out`** movement quantities over the last `VELOCITY_WINDOW_DAYS` ÷ window (`in`/`adjustment` ignored) — this path must stay byte-identical (existing tests pin it). There is **no supplier-lead-time field**, so lead time is always defaulted (`ReorderConfig::DEFAULT_LEAD_TIME_DAYS = 7`); unit cost is `product.cost` with a null fallback. All tunables are named constants on `Intelligence/Support/ReorderConfig.php`. `php artisan inventory:insights` prints the per-product table. **Intermediate maths are never rounded — rounding is display-only** (the reasoning strings and the frontend).
+- **Demo data is real retail history**: `inventory:import-retail` (in `app/Console/Commands/`, helpers in `database/seeders/RetailDataset/`) streams the UCI Online Retail II workbook, curates ~250 SKUs, and **bulk-inserts backdated ledger rows directly** (bypassing `StockService::adjust` — the only sanctioned bypass) with per-product `quantity_before/after` chains and a whole-day date shift so history ends yesterday. Sales are real; costs/categories/replenishment are synthesized (attribution: CC BY 4.0, see Apps/README.md "Demo data").
 
 ### Conventions
 
@@ -75,7 +88,9 @@ A module (`app/Modules/<Module>/`) contains: `Controllers/`, `Requests/`, `Servi
 - `src/lib/api.ts` — single axios instance: request interceptor attaches the bearer token from `localStorage`; response interceptor clears it and redirects to `/login` on 401. `apiErrorMessage()` extracts the first validation error / message.
 - `src/api/*.ts` — one typed module per backend resource; `src/types.ts` mirrors the backend DTO JSON (snake_case keys).
 - `src/context/AuthContext.tsx` — holds the session, bootstraps from a persisted token via `/auth/me`; `ProtectedRoute` gates the authenticated routes; `Layout` is the app shell. Routes are declared in `App.tsx` (React Router v7, declarative `<Routes>`).
-- `src/components/ui.tsx` — the shared Tailwind primitives (Button, Input, Modal, Card, Badge, Pagination, etc.). Reuse these rather than re-styling.
+- `src/components/ui/` — the shared design system (barrel `index.ts`; all `../components/ui` imports resolve here). Primitives: Button, Input/Select/Textarea/Checkbox, Field, Card, Badge (**tone keys `gray|green|red|amber|indigo` are a public contract** — `lib/recommendation.ts` tests pin them), Modal/Drawer/ConfirmDialog, Table/THead/TBody/TH/TD/Pagination, StatCard (+Sparkline), PageHeader, SegmentedControl, Tooltip, CapacityBar, Avatar, Skeleton family, EmptyState. Reuse these rather than re-styling.
+- Design tokens live in `src/index.css` `@theme` — brand = "Harbor" teal scale (`brand-*`), semantic `success/warning/danger/info` scales, `--shadow-card/pop`, Inter Variable + JetBrains Mono (self-hosted via @fontsource, no CDN). **Never use raw `indigo-*` classes.** Brand name/tagline: `src/lib/brand.ts` (one-line swap).
+- `src/components/charts/` — Recharts components (default exports, ALWAYS lazy-loaded via `React.lazy` + `<Suspense fallback={<ChartSkeleton/>}>` so auth/catalog pages don't pay the bundle cost): MovementsTrendChart (accepts an optional forecast `projection`), CategoryValueChart, CashTiedUpChart, HistoryForecastChart (history + dashed forecast + p90 band).
 
 ### TypeScript build constraints (will fail `tsc -b`)
 

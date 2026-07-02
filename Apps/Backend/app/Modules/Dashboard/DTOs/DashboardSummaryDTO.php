@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Dashboard\DTOs;
 
+use App\Modules\Product\DTOs\ProductDTO;
 use App\Modules\Shared\DTOs\BaseData;
+use App\Modules\Stock\DTOs\StockMovementDTO;
 
 final class DashboardSummaryDTO extends BaseData
 {
     /**
-     * @param  array<int, \App\Modules\Product\DTOs\ProductDTO>  $lowStockProducts
-     * @param  array<int, \App\Modules\Stock\DTOs\StockMovementDTO>  $recentMovements
+     * @param  array<int, ProductDTO>  $lowStockProducts
+     * @param  array<int, StockMovementDTO>  $recentMovements
      */
     public function __construct(
         public readonly int $totalProducts,
@@ -22,8 +24,7 @@ final class DashboardSummaryDTO extends BaseData
         public readonly float $totalStockValue,
         public readonly array $lowStockProducts,
         public readonly array $recentMovements,
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

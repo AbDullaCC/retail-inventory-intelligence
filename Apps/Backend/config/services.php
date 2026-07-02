@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    // Python forecasting sidecar (Apps/Forecast) — see app/Modules/Forecast.
+    'forecast' => [
+        'url' => env('FORECAST_SERVICE_URL', 'http://127.0.0.1:8100'),
+        'timeout' => (int) env('FORECAST_SERVICE_TIMEOUT', 120),
+        'chunk_size' => 50,
+        'horizon_days' => 28,
+        'history_days' => 730,
+        'stale_after_hours' => 48,
+    ],
+
 ];

@@ -36,6 +36,12 @@ final class ReorderConfig
     /** Fallback unit cost when a product's `cost` is null. */
     public const DEFAULT_UNIT_COST = 0.0;
 
+    /**
+     * Below this model-expected daily demand a product with stock on hand is
+     * "dead stock" (≈ under 1.5 units/month). Forecast mode only.
+     */
+    public const DEAD_STOCK_DAILY_DEMAND = 0.05;
+
     public function __construct(
         public readonly int $velocityWindowDays = self::VELOCITY_WINDOW_DAYS,
         public readonly int $safetyBufferDays = self::SAFETY_BUFFER_DAYS,
@@ -44,6 +50,7 @@ final class ReorderConfig
         public readonly int $neededStockDays = self::NEEDED_STOCK_DAYS,
         public readonly int $defaultLeadTimeDays = self::DEFAULT_LEAD_TIME_DAYS,
         public readonly float $defaultUnitCost = self::DEFAULT_UNIT_COST,
+        public readonly float $deadStockDailyDemand = self::DEAD_STOCK_DAILY_DEMAND,
     ) {}
 
     public static function defaults(): self

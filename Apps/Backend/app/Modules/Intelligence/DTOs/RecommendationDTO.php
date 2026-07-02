@@ -13,7 +13,9 @@ use App\Modules\Shared\DTOs\BaseData;
 final class RecommendationDTO extends BaseData
 {
     /**
-     * @param  'reorder'|'overstock'|'healthy'  $type
+     * @param  'reorder'|'overstock'|'healthy'|'dead_stock'  $type
+     * @param  'model'|'fallback'  $forecastSource
+     * @param  'high'|'medium'|'low'|null  $stockoutRisk
      */
     public function __construct(
         public readonly int $productId,
@@ -36,6 +38,14 @@ final class RecommendationDTO extends BaseData
         public readonly bool $isOverstocked,
         public readonly float $cashTiedUp,
         public readonly string $reasoning,
+        public readonly string $forecastSource = 'fallback',
+        public readonly ?string $modelUsed = null,
+        public readonly ?string $forecastGeneratedAt = null,
+        public readonly ?string $projectedStockoutDate = null,
+        public readonly ?string $stockoutRisk = null,
+        public readonly ?float $demandTrendPct = null,
+        public readonly ?float $projectedUnits30d = null,
+        public readonly ?float $projectedRevenue30d = null,
     ) {}
 
     public function toArray(): array
@@ -61,6 +71,14 @@ final class RecommendationDTO extends BaseData
             'is_overstocked' => $this->isOverstocked,
             'cash_tied_up' => $this->cashTiedUp,
             'reasoning' => $this->reasoning,
+            'forecast_source' => $this->forecastSource,
+            'model_used' => $this->modelUsed,
+            'forecast_generated_at' => $this->forecastGeneratedAt,
+            'projected_stockout_date' => $this->projectedStockoutDate,
+            'stockout_risk' => $this->stockoutRisk,
+            'demand_trend_pct' => $this->demandTrendPct,
+            'projected_units_30d' => $this->projectedUnits30d,
+            'projected_revenue_30d' => $this->projectedRevenue30d,
         ];
     }
 }

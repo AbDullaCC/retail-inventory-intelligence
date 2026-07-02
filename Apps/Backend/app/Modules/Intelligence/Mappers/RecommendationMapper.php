@@ -44,6 +44,14 @@ final class RecommendationMapper
             isOverstocked: $metrics->isOverstocked,
             cashTiedUp: $metrics->cashTiedUp,
             reasoning: $metrics->reasoning,
+            forecastSource: $metrics->forecastSource,
+            modelUsed: $metrics->modelUsed,
+            forecastGeneratedAt: $metrics->forecastGeneratedAt,
+            projectedStockoutDate: $metrics->projectedStockoutDate,
+            stockoutRisk: $metrics->stockoutRisk,
+            demandTrendPct: $metrics->demandTrendPct,
+            projectedUnits30d: $metrics->projectedUnits30d,
+            projectedRevenue30d: $metrics->projectedRevenue30d,
         );
     }
 }

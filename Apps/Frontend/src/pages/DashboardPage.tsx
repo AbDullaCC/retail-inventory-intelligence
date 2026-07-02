@@ -1,45 +1,44 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import {
-  AlertTriangle,
-  Boxes,
-  DollarSign,
-  Package,
-  PackageX,
-  Tags,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { AlertTriangle, PackageX, TrendingUp, Wallet } from 'lucide-react'
 import { dashboardApi } from '../api/dashboard'
+import { forecastApi } from '../api/forecast'
 import { apiErrorMessage } from '../lib/api'
-import { Badge, Card, EmptyState, PageSpinner } from '../components/ui'
+import {
+  Badge,
+  CapacityBar,
+  Card,
+  ChartSkeleton,
+  EmptyState,
+  PageHeader,
+  SegmentedControl,
+  StatCard,
+  StatCardSkeleton,
+  TableSkeleton,
+  cn,
+} from '../components/ui'
 import { StockStatusBadge } from '../components/StockStatusBadge'
 import { formatCurrency, formatDateTime, formatNumber } from '../lib/format'
-import type { DashboardSummary, StockMovementType } from '../types'
+import { computeDelta, toSparkline, totalUnitsOut } from '../lib/trends'
+import { usePageTitle } from '../lib/usePageTitle'
+import type {
+  DashboardSummary,
+  DashboardTrends,
+  ForecastSummary,
+  StockMovementType,
+} from '../types'
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string
-  value: string
-  icon: LucideIcon
-  tone: string
-}) {
-  return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{label}</p>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${tone}`}>
-          <Icon className="h-5 w-5" />
-        </span>
-      </div>
-      <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
-    </Card>
-  )
-}
+const MovementsTrendChart = lazy(() => import('../components/charts/MovementsTrendChart'))
+const CategoryValueChart = lazy(() => import('../components/charts/CategoryValueChart'))
+
+type TrendWindow = '7' | '30' | '90'
+
+const TREND_OPTIONS: Array<{ value: TrendWindow; label: string }> = [
+  { value: '7', label: '7d' },
+  { value: '30', label: '30d' },
+  { value: '90', label: '90d' },
+]
 
 function movementTone(type: StockMovementType): 'green' | 'red' | 'indigo' {
   if (type === 'in') return 'green'
@@ -47,140 +46,276 @@ function movementTone(type: StockMovementType): 'green' | 'red' | 'indigo' {
   return 'indigo'
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <StatCardSkeleton key={i} />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <div className="p-5">
+            <ChartSkeleton height={260} />
+          </div>
+        </Card>
+        <Card>
+          <div className="p-5">
+            <ChartSkeleton height={260} />
+          </div>
+        </Card>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <TableSkeleton rows={5} cols={3} />
+        </Card>
+        <Card>
+          <TableSkeleton rows={5} cols={3} />
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage() {
+  usePageTitle('Dashboard')
+
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [trends, setTrends] = useState<DashboardTrends | null>(null)
+  const [forecast, setForecast] = useState<ForecastSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [trendsLoading, setTrendsLoading] = useState(true)
+  const [days, setDays] = useState<TrendWindow>('30')
 
   useEffect(() => {
-    dashboardApi
-      .summary()
-      .then(setSummary)
-      .catch((error) => toast.error(apiErrorMessage(error)))
-      .finally(() => setLoading(false))
+    let cancelled = false
+    Promise.all([
+      dashboardApi
+        .summary()
+        .then((data) => {
+          if (!cancelled) setSummary(data)
+        })
+        .catch((error) => toast.error(apiErrorMessage(error))),
+      forecastApi
+        .summary()
+        .then((data) => {
+          if (!cancelled) setForecast(data)
+        })
+        // Forecasts are optional — render the dashboard without a projection.
+        .catch(() => undefined),
+    ]).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  if (loading) return <PageSpinner />
-  if (!summary) return <EmptyState title="No data" message="Could not load the dashboard." />
+  // Changing the window refetches only the trends.
+  useEffect(() => {
+    let cancelled = false
+    setTrendsLoading(true)
+    dashboardApi
+      .trends({ days: Number(days) })
+      .then((data) => {
+        if (!cancelled) setTrends(data)
+      })
+      .catch((error) => toast.error(apiErrorMessage(error)))
+      .finally(() => {
+        if (!cancelled) setTrendsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [days])
+
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+  const pageLoading = loading || (trendsLoading && !trends)
+  const series = trends?.series ?? []
+  const sparkline = toSparkline(series)
+  const hasForecast = forecast !== null && forecast.forecasted_count > 0
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Overview of your inventory health.</p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Dashboard"
+        description={`Today is ${today}`}
+        actions={<SegmentedControl options={TREND_OPTIONS} value={days} onChange={setDays} />}
+      />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard
-          label="Products"
-          value={`${formatNumber(summary.active_products)} / ${formatNumber(summary.total_products)}`}
-          icon={Package}
-          tone="bg-indigo-100 text-indigo-700"
-        />
-        <StatCard
-          label="Categories"
-          value={formatNumber(summary.total_categories)}
-          icon={Tags}
-          tone="bg-sky-100 text-sky-700"
-        />
-        <StatCard
-          label="Stock value"
-          value={formatCurrency(summary.total_stock_value)}
-          icon={DollarSign}
-          tone="bg-emerald-100 text-emerald-700"
-        />
-        <StatCard
-          label="Stock units"
-          value={formatNumber(summary.total_stock_units)}
-          icon={Boxes}
-          tone="bg-slate-100 text-slate-700"
-        />
-        <StatCard
-          label="Low stock"
-          value={formatNumber(summary.low_stock_count)}
-          icon={AlertTriangle}
-          tone="bg-amber-100 text-amber-700"
-        />
-        <StatCard
-          label="Out of stock"
-          value={formatNumber(summary.out_of_stock_count)}
-          icon={PackageX}
-          tone="bg-red-100 text-red-700"
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Low stock products */}
-        <Card>
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-semibold text-slate-900">Low stock alerts</h2>
-            <p className="text-sm text-slate-500">Products at or below their reorder level.</p>
+      {pageLoading ? (
+        <DashboardSkeleton />
+      ) : !summary ? (
+        <EmptyState title="No data" message="Could not load the dashboard." />
+      ) : (
+        <>
+          <div className={cn('grid grid-cols-2 gap-4', hasForecast ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
+            <StatCard
+              label="Stock value"
+              value={formatCurrency(summary.total_stock_value)}
+              icon={<Wallet className="h-4 w-4" />}
+              hint={`${formatNumber(summary.active_products)} of ${formatNumber(summary.total_products)} products active`}
+            />
+            <StatCard
+              label={`Units sold (${days}d)`}
+              value={formatNumber(totalUnitsOut(series))}
+              delta={computeDelta(sparkline)}
+              deltaLabel="vs prior half"
+              sparkline={sparkline}
+            />
+            {hasForecast && (
+              <StatCard
+                label="Projected revenue (30d)"
+                value={formatCurrency(forecast.projected_revenue_30d)}
+                tone="brand"
+                icon={<TrendingUp className="h-4 w-4" />}
+                hint={`${formatNumber(forecast.forecasted_count)} products forecasted`}
+              />
+            )}
+            <StatCard
+              label="Low stock"
+              value={formatNumber(summary.low_stock_count)}
+              tone="warning"
+              icon={<AlertTriangle className="h-4 w-4" />}
+              hint="at or below reorder level"
+            />
+            <StatCard
+              label="Out of stock"
+              value={formatNumber(summary.out_of_stock_count)}
+              tone="danger"
+              icon={<PackageX className="h-4 w-4" />}
+            />
           </div>
-          {summary.low_stock_products.length === 0 ? (
-            <EmptyState title="All good!" message="No products need restocking right now." />
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {summary.low_stock_products.map((product) => (
-                <li key={product.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="min-w-0">
-                    <Link
-                      to={`/products/${product.id}`}
-                      className="truncate font-medium text-slate-800 hover:text-indigo-600"
-                    >
-                      {product.name}
-                    </Link>
-                    <p className="text-xs text-slate-400">{product.sku}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-500">
-                      {product.quantity} / {product.reorder_level}
-                    </span>
-                    <StockStatusBadge product={product} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
 
-        {/* Recent movements */}
-        <Card>
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-semibold text-slate-900">Recent stock activity</h2>
-            <p className="text-sm text-slate-500">Latest inventory movements.</p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card
+              className="lg:col-span-2"
+              title="Stock movement"
+              subtitle="Units sold vs received per day — dashed line is the model projection"
+            >
+              <div className="p-5">
+                {trendsLoading ? (
+                  <ChartSkeleton height={260} />
+                ) : (
+                  <Suspense fallback={<ChartSkeleton height={260} />}>
+                    <MovementsTrendChart
+                      series={series}
+                      projection={hasForecast ? forecast.daily : undefined}
+                      height={260}
+                    />
+                  </Suspense>
+                )}
+              </div>
+            </Card>
+            <Card title="Inventory value by category">
+              <div className="p-5">
+                {trendsLoading ? (
+                  <ChartSkeleton height={260} />
+                ) : (
+                  <Suspense fallback={<ChartSkeleton height={260} />}>
+                    <CategoryValueChart data={trends?.category_values ?? []} height={260} />
+                  </Suspense>
+                )}
+              </div>
+            </Card>
           </div>
-          {summary.recent_movements.length === 0 ? (
-            <EmptyState title="No activity yet" message="Stock movements will appear here." />
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {summary.recent_movements.map((movement) => (
-                <li key={movement.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-800">
-                      {movement.product_name ?? `Product #${movement.product_id}`}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {movement.reason ?? movement.type_label} · {formatDateTime(movement.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={
-                        movement.change >= 0
-                          ? 'text-sm font-medium text-emerald-600'
-                          : 'text-sm font-medium text-red-600'
-                      }
-                    >
-                      {movement.change >= 0 ? '+' : ''}
-                      {movement.change}
-                    </span>
-                    <Badge tone={movementTone(movement.type)}>{movement.type_label}</Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card
+              title="Low stock alerts"
+              actions={
+                <Link
+                  to="/products"
+                  className="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700"
+                >
+                  View all
+                </Link>
+              }
+            >
+              {summary.low_stock_products.length === 0 ? (
+                <EmptyState title="All good!" message="No products need restocking right now." />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {summary.low_stock_products.map((product) => (
+                    <li key={product.id} className="px-5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-baseline gap-2">
+                          <Link
+                            to={`/products/${product.id}`}
+                            className="truncate text-sm font-medium text-slate-800 transition-colors hover:text-brand-600"
+                          >
+                            {product.name}
+                          </Link>
+                          <span className="shrink-0 font-mono text-xs text-slate-400">{product.sku}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <span className="text-sm text-slate-600 tabular-nums">
+                            {formatNumber(product.quantity)} / {formatNumber(product.reorder_level)} reorder
+                          </span>
+                          <StockStatusBadge product={product} />
+                        </div>
+                      </div>
+                      <CapacityBar
+                        value={product.quantity}
+                        max={product.reorder_level}
+                        className="mt-2"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card title="Recent activity">
+              {summary.recent_movements.length === 0 ? (
+                <EmptyState title="No activity yet" message="Stock movements will appear here." />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {summary.recent_movements.map((movement) => (
+                    <li key={movement.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge tone={movementTone(movement.type)} dot>
+                            {movement.type_label}
+                          </Badge>
+                          <Link
+                            to={`/products/${movement.product_id}`}
+                            className="truncate text-sm font-medium text-slate-800 transition-colors hover:text-brand-600"
+                          >
+                            {movement.product_name ?? `Product #${movement.product_id}`}
+                          </Link>
+                        </div>
+                        {movement.reason && (
+                          <p className="mt-0.5 truncate text-xs text-slate-400">{movement.reason}</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p
+                          className={cn(
+                            'font-mono text-sm font-medium tabular-nums',
+                            movement.change >= 0 ? 'text-success-600' : 'text-danger-600',
+                          )}
+                        >
+                          {movement.change >= 0 ? '+' : ''}
+                          {formatNumber(movement.change)}
+                        </p>
+                        <p className="text-xs text-slate-400">{formatDateTime(movement.created_at)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   )
 }

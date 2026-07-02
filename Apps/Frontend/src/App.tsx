@@ -15,7 +15,21 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#fff',
+              color: '#0f172a',
+              border: '1px solid #e2e8f0',
+              boxShadow: 'var(--shadow-pop)',
+              borderRadius: '10px',
+              fontSize: '14px',
+            },
+            success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
+            error: { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
+          }}
+        />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

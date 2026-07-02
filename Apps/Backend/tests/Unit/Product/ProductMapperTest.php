@@ -14,12 +14,12 @@ class ProductMapperTest extends TestCase
 {
     private function mapper(): ProductMapper
     {
-        return new ProductMapper(new CategoryMapper());
+        return new ProductMapper(new CategoryMapper);
     }
 
     public function test_it_maps_a_product_to_a_dto_with_derived_fields(): void
     {
-        $product = new Product();
+        $product = new Product;
         $product->forceFill([
             'id' => 1,
             'category_id' => 7,
@@ -44,10 +44,10 @@ class ProductMapperTest extends TestCase
 
     public function test_it_includes_the_nested_category_when_loaded(): void
     {
-        $category = new Category();
+        $category = new Category;
         $category->forceFill(['id' => 7, 'name' => 'Beverages', 'description' => null]);
 
-        $product = new Product();
+        $product = new Product;
         $product->forceFill([
             'id' => 1,
             'category_id' => 7,

@@ -12,7 +12,7 @@ class StockMovementMapperTest extends TestCase
 {
     public function test_it_maps_a_movement_and_computes_the_change(): void
     {
-        $movement = new StockMovement();
+        $movement = new StockMovement;
         $movement->forceFill([
             'id' => 1,
             'product_id' => 9,
@@ -24,7 +24,7 @@ class StockMovementMapperTest extends TestCase
             'reason' => 'Customer sale',
         ]);
 
-        $dto = (new StockMovementMapper())->toDTO($movement)->toArray();
+        $dto = (new StockMovementMapper)->toDTO($movement)->toArray();
 
         $this->assertSame('out', $dto['type']);
         $this->assertSame('Stock Out', $dto['type_label']);

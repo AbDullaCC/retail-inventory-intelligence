@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { categoriesApi } from '../api/categories'
@@ -8,19 +8,31 @@ import { productsApi } from '../api/products'
 import type { ProductFilters, ProductPayload } from '../api/products'
 import { apiErrorMessage } from '../lib/api'
 import {
+  Badge,
   Button,
+  CapacityBar,
   Card,
+  Checkbox,
+  ConfirmDialog,
+  Drawer,
   EmptyState,
   Field,
   Input,
-  Modal,
+  PageHeader,
   Pagination,
-  PageSpinner,
   Select,
+  Table,
+  TableSkeleton,
+  TBody,
+  TD,
+  TH,
+  THead,
   Textarea,
+  Tooltip,
 } from '../components/ui'
 import { StockStatusBadge } from '../components/StockStatusBadge'
 import { formatCurrency, formatNumber } from '../lib/format'
+import { usePageTitle } from '../lib/usePageTitle'
 import type { Category, PaginationMeta, Product } from '../types'
 
 interface FormState {
@@ -56,7 +68,17 @@ const sortOptions: Array<{ value: string; label: string; sort_by: string; sort_d
   { value: 'quantity-desc', label: 'Stock (high → low)', sort_by: 'quantity', sort_dir: 'desc' },
 ]
 
+/** Tiny uppercase group label used to section the drawer form. */
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="pt-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{children}</p>
+  )
+}
+
 export function ProductsPage() {
+  usePageTitle('Products')
+  const navigate = useNavigate()
+
   const [products, setProducts] = useState<Product[]>([])
   const [meta, setMeta] = useState<PaginationMeta | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
@@ -69,11 +91,12 @@ export function ProductsPage() {
     sort_dir: 'asc',
   })
 
-  const [modalOpen, setModalOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [saving, setSaving] = useState(false)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Load categories once for the filter + form selects.
   useEffect(() => {
@@ -124,6 +147,19 @@ export function ProductsPage() {
     }
   }
 
+  /** Column-header sorting: first click sorts asc, clicking again flips the direction. */
+  const toggleSort = (column: string) => {
+    setFilters((f) => ({
+      ...f,
+      sort_by: column,
+      sort_dir: f.sort_by === column && f.sort_dir === 'asc' ? 'desc' : 'asc',
+      page: 1,
+    }))
+  }
+
+  const sortDirFor = (column: string): 'asc' | 'desc' | null =>
+    filters.sort_by === column ? filters.sort_dir ?? 'asc' : null
+
   const onCategoryFilter = (e: ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
     setFilters((f) => ({ ...f, category_id: value ? Number(value) : '', page: 1 }))
@@ -132,7 +168,7 @@ export function ProductsPage() {
   const openCreate = () => {
     setEditing(null)
     setForm(emptyForm)
-    setModalOpen(true)
+    setDrawerOpen(true)
   }
 
   const openEdit = (product: Product) => {
@@ -148,7 +184,7 @@ export function ProductsPage() {
       is_active: product.is_active,
       quantity: String(product.quantity),
     })
-    setModalOpen(true)
+    setDrawerOpen(true)
   }
 
   const refresh = () => setFilters((f) => ({ ...f }))
@@ -179,7 +215,7 @@ export function ProductsPage() {
         await productsApi.create(payload)
         toast.success('Product created.')
       }
-      setModalOpen(false)
+      setDrawerOpen(false)
       refresh()
     } catch (error) {
       toast.error(apiErrorMessage(error))
@@ -188,17 +224,18 @@ export function ProductsPage() {
     }
   }
 
-  const onDelete = async (product: Product) => {
-    if (!window.confirm(`Delete product "${product.name}"? This also removes its stock history.`)) return
-    setDeletingId(product.id)
+  const onDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      await productsApi.remove(product.id)
+      await productsApi.remove(deleteTarget.id)
       toast.success('Product deleted.')
+      setDeleteTarget(null)
       refresh()
     } catch (error) {
       toast.error(apiErrorMessage(error))
     } finally {
-      setDeletingId(null)
+      setDeleting(false)
     }
   }
 
@@ -206,137 +243,191 @@ export function ProductsPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Products</h1>
-          <p className="text-sm text-slate-500">Manage your catalogue and stock levels.</p>
+    <div>
+      <PageHeader
+        title="Products"
+        description={meta ? `${meta.total} products in the catalog` : undefined}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            New product
+          </Button>
+        }
+      />
+
+      {/* Toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-72">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            className="pl-9"
+            placeholder="Search name or SKU…"
+            aria-label="Search products"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          New product
-        </Button>
+        <Select
+          className="w-44"
+          aria-label="Filter by category"
+          value={filters.category_id ? String(filters.category_id) : ''}
+          onChange={onCategoryFilter}
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+        <Select className="w-48" aria-label="Sort products" value={currentSort} onChange={onSortChange}>
+          {sortOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        <Checkbox
+          label="Low stock only"
+          checked={filters.low_stock === true}
+          onChange={(e) => setFilters((f) => ({ ...f, low_stock: e.target.checked, page: 1 }))}
+        />
       </div>
 
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="Search name or SKU…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </div>
-          <Select value={filters.category_id ? String(filters.category_id) : ''} onChange={onCategoryFilter}>
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-          <Select value={currentSort} onChange={onSortChange}>
-            {sortOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-              checked={filters.low_stock === true}
-              onChange={(e) => setFilters((f) => ({ ...f, low_stock: e.target.checked, page: 1 }))}
-            />
-            Low stock only
-          </label>
-        </div>
-      </Card>
-
-      {/* Table */}
       <Card>
         {loading ? (
-          <PageSpinner />
+          <TableSkeleton rows={10} cols={6} />
         ) : products.length === 0 ? (
           <EmptyState
             title="No products found"
             message="Try adjusting your filters, or add a new product."
-            action={<Button onClick={openCreate}>New product</Button>}
+            action={
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                New product
+              </Button>
+            }
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">Product</th>
-                    <th className="px-5 py-3 font-medium">Category</th>
-                    <th className="px-5 py-3 text-right font-medium">Price</th>
-                    <th className="px-5 py-3 text-right font-medium">Stock</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3">
-                        <Link
-                          to={`/products/${product.id}`}
-                          className="font-medium text-slate-800 hover:text-indigo-600"
-                        >
-                          {product.name}
-                        </Link>
-                        <p className="text-xs text-slate-400">{product.sku}</p>
-                      </td>
-                      <td className="px-5 py-3 text-slate-600">{product.category?.name ?? '—'}</td>
-                      <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(product.price)}</td>
-                      <td className="px-5 py-3 text-right text-slate-700">{formatNumber(product.quantity)}</td>
-                      <td className="px-5 py-3">
-                        <StockStatusBadge product={product} />
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-1">
+            <Table>
+              <THead>
+                <TH sortable sortDir={sortDirFor('name')} onSort={() => toggleSort('name')}>
+                  Product
+                </TH>
+                <TH align="right" sortable sortDir={sortDirFor('price')} onSort={() => toggleSort('price')}>
+                  Price
+                </TH>
+                <TH
+                  align="right"
+                  sortable
+                  sortDir={sortDirFor('quantity')}
+                  onSort={() => toggleSort('quantity')}
+                >
+                  Stock
+                </TH>
+                <TH align="right">Value</TH>
+                <TH>Status</TH>
+                <TH align="right">
+                  <span className="sr-only">Actions</span>
+                </TH>
+              </THead>
+              <TBody>
+                {products.map((product) => (
+                  <tr
+                    key={product.id}
+                    className="cursor-pointer transition-colors hover:bg-slate-50/80"
+                    onClick={() => navigate(`/products/${product.id}`)}
+                  >
+                    <TD>
+                      <p className="font-medium text-slate-900">{product.name}</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="font-mono text-xs text-slate-400">{product.sku}</span>
+                        {product.category && <Badge tone="gray">{product.category.name}</Badge>}
+                      </div>
+                    </TD>
+                    <TD numeric className="text-slate-700">
+                      {formatCurrency(product.price)}
+                    </TD>
+                    <TD numeric className="text-slate-700">
+                      {formatNumber(product.quantity)}
+                      <div className="ml-auto mt-1 w-24">
+                        <CapacityBar value={product.quantity} max={product.reorder_level} />
+                      </div>
+                    </TD>
+                    <TD numeric className="text-slate-700">
+                      {formatCurrency(product.stock_value)}
+                    </TD>
+                    <TD>
+                      <StockStatusBadge product={product} />
+                    </TD>
+                    <TD>
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip content="View">
                           <Link
                             to={`/products/${product.id}`}
-                            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
-                            aria-label="View"
+                            aria-label={`View ${product.name}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(product)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                        </Tooltip>
+                        <Tooltip content="Edit">
                           <Button
                             variant="ghost"
-                            size="sm"
-                            loading={deletingId === product.id}
-                            onClick={() => void onDelete(product)}
+                            size="xs"
+                            aria-label={`Edit ${product.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEdit(product)
+                            }}
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </Tooltip>
+                        <Tooltip content="Delete">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            aria-label={`Delete ${product.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeleteTarget(product)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-danger-600" />
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </TD>
+                  </tr>
+                ))}
+              </TBody>
+            </Table>
             {meta && <Pagination meta={meta} onPage={(page) => setFilters((f) => ({ ...f, page }))} />}
           </>
         )}
       </Card>
 
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         title={editing ? 'Edit product' : 'New product'}
+        subtitle={editing ? `SKU ${editing.sku}` : undefined}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="product-form" loading={saving}>
+              {editing ? 'Save changes' : 'Create product'}
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form id="product-form" onSubmit={onSubmit} className="space-y-4">
+          <SectionLabel>Basics</SectionLabel>
           <Field label="Category" htmlFor="p-category" required>
             <Select
               id="p-category"
@@ -379,6 +470,8 @@ export function ProductsPage() {
               onChange={(e) => setField('description', e.target.value)}
             />
           </Field>
+
+          <SectionLabel>Pricing</SectionLabel>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Price" htmlFor="p-price" required>
               <Input
@@ -402,6 +495,8 @@ export function ProductsPage() {
               />
             </Field>
           </div>
+
+          <SectionLabel>Inventory</SectionLabel>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Reorder level" htmlFor="p-reorder" hint="Low-stock threshold.">
               <Input
@@ -424,25 +519,26 @@ export function ProductsPage() {
               </Field>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-              checked={form.is_active}
-              onChange={(e) => setField('is_active', e.target.checked)}
-            />
-            Active (visible &amp; sellable)
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={saving}>
-              {editing ? 'Save changes' : 'Create product'}
-            </Button>
-          </div>
+          <Checkbox
+            label="Active (visible & sellable)"
+            checked={form.is_active}
+            onChange={(e) => setField('is_active', e.target.checked)}
+          />
         </form>
-      </Modal>
+      </Drawer>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void onDelete()}
+        title="Delete product"
+        message={
+          deleteTarget
+            ? `Delete "${deleteTarget.name}"? This also removes its stock history.`
+            : ''
+        }
+        loading={deleting}
+      />
     </div>
   )
 }

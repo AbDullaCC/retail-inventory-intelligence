@@ -26,31 +26,42 @@ final class InventoryInsightsCommand extends Command
             return [
                 $r->sku,
                 Str::limit($r->name, 22),
+                $r->modelUsed ?? 'window-avg',
                 number_format($r->salesVelocity, 2),
                 $r->daysOfStockLeft === null ? '—' : (string) round($r->daysOfStockLeft),
                 $r->needsReorder ? 'YES'.($r->isUrgent ? ' (urgent)' : '') : '',
                 $r->needsReorder ? (string) $r->suggestedReorderQty : '',
-                $r->isOverstocked ? 'YES' : '',
+                $r->stockoutRisk ?? '',
                 '$'.number_format($r->cashTiedUp, 2),
                 $r->type,
             ];
         }, $summary->recommendations);
 
         $this->table(
-            ['SKU', 'Product', 'Vel/day', 'Days left', 'Reorder?', 'Qty', 'Overstock?', 'Cash tied up', 'Verdict'],
+            ['SKU', 'Product', 'Model', 'Vel/day', 'Days left', 'Reorder?', 'Qty', 'Risk', 'Cash tied up', 'Verdict'],
             $rows,
         );
 
         $this->newLine();
         $this->info(sprintf(
-            'Reorder: %d   Overstock: %d   Healthy: %d   Total cash tied up: $%s',
+            'Reorder: %d   Overstock: %d   Dead stock: %d   Healthy: %d   Total cash tied up: $%s',
             $summary->reorderCount,
             $summary->overstockCount,
+            $summary->deadStockCount,
             $summary->healthyCount,
             number_format($summary->totalCashTiedUp, 2),
         ));
+        if ($summary->forecastedCount > 0) {
+            $this->line(sprintf(
+                '<fg=gray>%d of %d products model-forecasted · projected 30-day revenue $%s · dead stock recoverable $%s</>',
+                $summary->forecastedCount,
+                count($summary->recommendations),
+                number_format($summary->projectedRevenue30d ?? 0, 2),
+                number_format($summary->deadStockCashRecoverable, 2),
+            ));
+        }
         $this->line(sprintf(
-            '<fg=gray>velocity window = %dd · lead time defaulted to %dd for all products (no lead-time field) · unit cost from product.cost</>',
+            '<fg=gray>velocity window = %dd (fallback) · lead time defaulted to %dd for all products (no lead-time field) · unit cost from product.cost</>',
             $summary->velocityWindowDays,
             $summary->defaultLeadTimeDays,
         ));

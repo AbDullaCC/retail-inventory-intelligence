@@ -15,7 +15,12 @@ use App\Modules\Intelligence\Services\ReorderCalculator;
 final class RecommendationMetrics
 {
     /**
-     * @param  'reorder'|'overstock'|'healthy'  $type
+     * The forecast-sourced fields (trailing, defaulted) are null/'fallback'
+     * when the calculator ran on the historical window average.
+     *
+     * @param  'reorder'|'overstock'|'healthy'|'dead_stock'  $type
+     * @param  'model'|'fallback'  $forecastSource
+     * @param  'high'|'medium'|'low'|null  $stockoutRisk
      */
     public function __construct(
         public readonly string $type,
@@ -31,5 +36,13 @@ final class RecommendationMetrics
         public readonly int $currentStock,
         public readonly int $leadTimeDays,
         public readonly float $unitCost,
+        public readonly string $forecastSource = 'fallback',
+        public readonly ?string $modelUsed = null,
+        public readonly ?string $forecastGeneratedAt = null,
+        public readonly ?string $projectedStockoutDate = null,
+        public readonly ?string $stockoutRisk = null,
+        public readonly ?float $demandTrendPct = null,
+        public readonly ?float $projectedUnits30d = null,
+        public readonly ?float $projectedRevenue30d = null,
     ) {}
 }
