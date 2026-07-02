@@ -70,7 +70,12 @@
       "Bash(cd \"D:/GitHub/retail-inventory-intelligence/Apps/Backend\" && php artisan test --compact 2>&1 | tail -2 && cd ../Frontend && npm run build 2>&1 | tail -2 && npm test 2>&1 | grep -E \"Tests|Test Files\" && npm run lint 2>&1 | tail -1 && cd ../Forecast && .venv/Scripts/python.exe -m pytest -q 2>&1 | tail -1)",
       "Bash(python -c \"import json,sys; spec=json.load\\(sys.stdin\\); print\\('openapi', spec['openapi']\\); print\\('paths:', len\\(spec['paths']\\)\\); print\\('new paths present:', all\\(p in spec['paths'] for p in ['/api/dashboard/trends','/api/forecast/summary','/api/products/{product}/forecast']\\)\\)\")",
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\)['data']; [print\\(m['type'], m['quantity'], m['quantity_before'], '->', m['quantity_after'], '|', m['reason'], '|', m['user_name']\\) for m in d]\")",
-      "Bash(curl -s -o /dev/null -w \"docs page: HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/docs)"
+      "Bash(curl -s -o /dev/null -w \"docs page: HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/docs)",
+      "Bash(python \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")",
+      "Bash(python -m pip install --quiet defusedxml)",
+      "Bash(py -3.12 -m pip install --quiet defusedxml)",
+      "Bash(py -3.12 \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")",
+      "Bash(PYTHONIOENCODING=utf-8 py -3.12 \"C:/Users/Bcc/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/92b5b509-c98e-4114-9962-2698bfc6be13/78c178d3-c467-436f-ad43-048e849ab8ea/skills/docx/scripts/office/validate.py\" \"D:/GitHub/retail-inventory-intelligence/docs/Forecasting-and-Data.docx\")"
     ]
   }
 }
