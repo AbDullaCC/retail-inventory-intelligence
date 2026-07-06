@@ -35,6 +35,16 @@ return [
         ],
     ],
 
+    // Shopify connector (custom-app token; GraphQL Admin API) — see app/Modules/Shopify.
+    'shopify' => [
+        'domain' => env('SHOPIFY_SHOP_DOMAIN'),
+        'token' => env('SHOPIFY_ADMIN_TOKEN'),
+        'version' => env('SHOPIFY_API_VERSION', '2026-01'),
+        'timeout' => (int) env('SHOPIFY_TIMEOUT', 30),
+        'history_days' => 730,
+        'throttle_delay_ms' => 1000,
+    ],
+
     // Python forecasting sidecar (Apps/Forecast) — see app/Modules/Forecast.
     'forecast' => [
         'url' => env('FORECAST_SERVICE_URL', 'http://127.0.0.1:8100'),

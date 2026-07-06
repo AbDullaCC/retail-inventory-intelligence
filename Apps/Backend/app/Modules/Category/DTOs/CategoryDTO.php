@@ -15,8 +15,7 @@ final class CategoryDTO extends BaseData
         public readonly ?int $productsCount,
         public readonly ?string $createdAt,
         public readonly ?string $updatedAt,
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

@@ -35,6 +35,7 @@ final class OpenApiSpec
                 ['name' => 'Stock', 'description' => 'Stock movements (the inventory ledger).'],
                 ['name' => 'Intelligence', 'description' => 'Reorder & overstock recommendations derived from sales history.'],
                 ['name' => 'Forecast', 'description' => 'Time-series demand forecasts (statsforecast sidecar) for charting.'],
+                ['name' => 'Shopify', 'description' => 'Store connector: read-only import of products, orders and inventory.'],
             ],
             'security' => [['bearerAuth' => []]],
             'paths' => self::paths(),
@@ -137,6 +138,43 @@ final class OpenApiSpec
                     'tags' => ['Intelligence'],
                     'summary' => 'Recommendation for a single product',
                     'responses' => ['200' => self::dataResponse('Recommendation'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
+                ],
+            ],
+            '/api/shopify/status' => [
+                'get' => [
+                    'tags' => ['Shopify'],
+                    'summary' => 'Connection status for the Integrations screen',
+                    'responses' => ['200' => self::dataResponse('ShopifyStatus'), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+            '/api/shopify/connect' => [
+                'post' => [
+                    'tags' => ['Shopify'],
+                    'summary' => 'Connect a store (validates the token live, stores it encrypted)',
+                    'requestBody' => self::body('ShopifyConnectInput'),
+                    'responses' => ['200' => self::dataResponse('ShopifyStatus'), '401' => self::ref('Unauthorized'), '422' => self::ref('ValidationError')],
+                ],
+            ],
+            '/api/shopify/sync' => [
+                'post' => [
+                    'tags' => ['Shopify'],
+                    'summary' => 'Import products, order history and inventory now',
+                    'description' => 'The first run backfills order history into the ledger (can take a minute); later runs are incremental. Follow a backfill with POST /api/forecast/run.',
+                    'responses' => ['200' => self::dataResponse('ShopifySyncResult'), '401' => self::ref('Unauthorized'), '422' => self::ref('ValidationError')],
+                ],
+            ],
+            '/api/shopify/connection' => [
+                'delete' => [
+                    'tags' => ['Shopify'],
+                    'summary' => 'Disconnect the store (imported data is kept)',
+                    'responses' => ['200' => self::messageResponse(), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+            '/api/forecast/run' => [
+                'post' => [
+                    'tags' => ['Forecast'],
+                    'summary' => 'Refresh all product forecasts from the sidecar',
+                    'responses' => ['200' => self::dataResponse('ForecastRunSummary'), '401' => self::ref('Unauthorized'), '503' => self::messageResponse('Forecast sidecar unreachable')],
                 ],
             ],
             '/api/forecast/summary' => [
@@ -592,6 +630,40 @@ final class OpenApiSpec
                     'default_lead_time_days' => ['type' => 'integer'],
                     'generated_at' => ['type' => 'string', 'format' => 'date-time'],
                     'recommendations' => ['type' => 'array', 'items' => self::schemaRef('Recommendation')],
+                ],
+            ],
+            'ShopifyStatus' => [
+                'type' => 'object',
+                'properties' => [
+                    'connected' => ['type' => 'boolean'],
+                    'source' => ['type' => 'string', 'enum' => ['ui', 'env'], 'nullable' => true],
+                    'domain' => ['type' => 'string', 'nullable' => true],
+                    'shop_name' => ['type' => 'string', 'nullable' => true],
+                    'last_synced_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    'last_stats' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => true],
+                ],
+            ],
+            'ShopifyConnectInput' => [
+                'type' => 'object',
+                'required' => ['domain', 'token'],
+                'properties' => [
+                    'domain' => ['type' => 'string', 'example' => 'your-store.myshopify.com'],
+                    'token' => ['type' => 'string', 'example' => 'shpat_…', 'description' => 'Admin API access token of a custom app with read_products, read_inventory, read_orders scopes.'],
+                ],
+            ],
+            'ShopifySyncResult' => [
+                'type' => 'object',
+                'properties' => [
+                    'stats' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'products_created/updated, orders_imported, order_lines_imported/conflicted, inventory_adjustments, backfill.'],
+                    'status' => self::schemaRef('ShopifyStatus'),
+                ],
+            ],
+            'ForecastRunSummary' => [
+                'type' => 'object',
+                'properties' => [
+                    'forecasted' => ['type' => 'integer'],
+                    'skipped' => ['type' => 'integer'],
+                    'models' => ['type' => 'object', 'additionalProperties' => ['type' => 'integer']],
                 ],
             ],
             'ForecastPoint' => [

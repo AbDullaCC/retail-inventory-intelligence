@@ -7,5 +7,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('forecast/summary', [ForecastController::class, 'summary']);
+    Route::post('forecast/run', [ForecastController::class, 'run']);
     Route::get('products/{product}/forecast', [ForecastController::class, 'show'])->whereNumber('product');
 });

@@ -10,6 +10,7 @@ import { ProductsPage } from './pages/ProductsPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { RecommendationsPage } from './pages/RecommendationsPage'
+import { IntegrationsPage } from './pages/IntegrationsPage'
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
               <Route path="/products/:id" element={<ProductDetailPage />} />
               <Route path="/recommendations" element={<RecommendationsPage />} />
               <Route path="/categories" element={<CategoriesPage />} />
+              <Route path="/integrations" element={<IntegrationsPage />} />
             </Route>
           </Route>
 

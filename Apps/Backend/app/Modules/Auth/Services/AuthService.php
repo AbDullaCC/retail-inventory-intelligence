@@ -23,8 +23,7 @@ final class AuthService implements AuthServiceInterface
 {
     public function __construct(
         private readonly UserMapper $mapper,
-    ) {
-    }
+    ) {}
 
     public function register(RegisterData $data): AuthTokenDTO
     {

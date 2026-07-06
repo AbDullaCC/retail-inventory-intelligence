@@ -27,8 +27,7 @@ final class ProductService implements ProductServiceInterface
     public function __construct(
         private readonly ProductMapper $mapper,
         private readonly StockServiceInterface $stockService,
-    ) {
-    }
+    ) {}
 
     public function paginate(ProductFilterData $filter): PaginatedData
     {

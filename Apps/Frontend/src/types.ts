@@ -157,6 +157,32 @@ export interface ProductForecast {
   forecast: ForecastPoint[]
 }
 
+export interface ShopifySyncStats {
+  products_created: number
+  products_updated: number
+  variants_skipped: number
+  orders_imported: number
+  order_lines_imported: number
+  order_lines_conflicted: number
+  inventory_adjustments: number
+  backfill: boolean
+}
+
+export interface ShopifyStatus {
+  connected: boolean
+  source: 'ui' | 'env' | null
+  domain: string | null
+  shop_name: string | null
+  last_synced_at: string | null
+  last_stats: ShopifySyncStats | null
+}
+
+export interface ForecastRunSummary {
+  forecasted: number
+  skipped: number
+  models: Record<string, number>
+}
+
 export interface ForecastSummaryDaily {
   date: string
   mean: number

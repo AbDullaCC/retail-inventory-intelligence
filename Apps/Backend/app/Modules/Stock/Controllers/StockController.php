@@ -14,8 +14,7 @@ final class StockController extends Controller
 {
     public function __construct(
         private readonly StockServiceInterface $service,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {

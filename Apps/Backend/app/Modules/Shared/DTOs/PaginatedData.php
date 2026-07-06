@@ -24,8 +24,7 @@ final class PaginatedData extends BaseData
         public readonly int $perPage,
         public readonly int $currentPage,
         public readonly int $lastPage,
-    ) {
-    }
+    ) {}
 
     /**
      * Build the envelope from an Eloquent paginator, mapping each model via $mapItem.

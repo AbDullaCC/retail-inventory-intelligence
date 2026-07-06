@@ -25,8 +25,7 @@ final class ProductDTO extends BaseData
         public readonly ?CategoryDTO $category,
         public readonly ?string $createdAt,
         public readonly ?string $updatedAt,
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { ApiItem, ForecastSummary, ProductForecast } from '../types'
+import type { ApiItem, ForecastRunSummary, ForecastSummary, ProductForecast } from '../types'
 
 export const forecastApi = {
   forProduct: (id: number): Promise<ProductForecast> =>
@@ -7,4 +7,7 @@ export const forecastApi = {
 
   summary: (): Promise<ForecastSummary> =>
     api.get<ApiItem<ForecastSummary>>('/forecast/summary').then((r) => r.data.data),
+
+  run: (): Promise<ForecastRunSummary> =>
+    api.post<ApiItem<ForecastRunSummary>>('/forecast/run').then((r) => r.data.data),
 }

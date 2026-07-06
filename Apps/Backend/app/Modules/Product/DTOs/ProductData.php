@@ -23,8 +23,7 @@ final class ProductData extends BaseData
         public readonly ?float $cost,
         public readonly int $reorderLevel,
         public readonly bool $isActive,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data

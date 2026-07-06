@@ -13,8 +13,7 @@ final class ProductMapper
 {
     public function __construct(
         private readonly CategoryMapper $categoryMapper,
-    ) {
-    }
+    ) {}
 
     public function toDTO(Product $product): ProductDTO
     {

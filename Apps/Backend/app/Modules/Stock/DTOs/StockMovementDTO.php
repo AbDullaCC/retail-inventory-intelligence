@@ -22,8 +22,7 @@ final class StockMovementDTO extends BaseData
         public readonly ?int $userId,
         public readonly ?string $userName,
         public readonly ?string $createdAt,
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

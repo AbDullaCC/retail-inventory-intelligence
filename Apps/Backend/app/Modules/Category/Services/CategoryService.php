@@ -18,8 +18,7 @@ final class CategoryService implements CategoryServiceInterface
 {
     public function __construct(
         private readonly CategoryMapper $mapper,
-    ) {
-    }
+    ) {}
 
     public function list(): array
     {

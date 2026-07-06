@@ -11,7 +11,9 @@ use App\Modules\Product\Models\Product;
 use App\Modules\Stock\Enums\StockMovementType;
 use App\Modules\Stock\Models\StockMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -135,5 +137,57 @@ class ForecastApiTest extends TestCase
     public function test_summary_requires_authentication(): void
     {
         $this->getJson('/api/forecast/summary')->assertUnauthorized();
+    }
+
+    public function test_run_endpoint_triggers_a_forecast_refresh(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $product = $this->product();
+
+        $m = StockMovement::query()->create([
+            'product_id' => $product->id, 'user_id' => null, 'type' => StockMovementType::Out,
+            'quantity' => 5, 'quantity_before' => 10, 'quantity_after' => 5, 'reason' => 'test',
+        ]);
+        $when = Carbon::now()->subDays(2);
+        StockMovement::query()->whereKey($m->id)->update(['created_at' => $when, 'updated_at' => $when]);
+
+        $forecastPayload = [
+            'generated_at' => Carbon::now()->toIso8601String(),
+            'horizon_days' => 28,
+            'results' => [[
+                'product_id' => $product->id,
+                'model_used' => 'SeasonalNaive',
+                'history_days' => 3,
+                'forecast' => array_map(
+                    static fn (int $i): array => ['date' => Carbon::now()->addDays($i)->format('Y-m-d'), 'mean' => 1.0, 'lo_90' => 0.0, 'hi_90' => 2.0],
+                    range(0, 27),
+                ),
+                'expected_daily_demand' => 1.0,
+                'demand_over_lead_time' => 7.0,
+                'p90_demand_over_lead_time' => 14.0,
+            ]],
+        ];
+
+        Http::fake([
+            '*/health' => Http::response(['status' => 'ok']),
+            '*/forecast' => Http::response($forecastPayload),
+        ]);
+
+        $this->postJson('/api/forecast/run')
+            ->assertOk()
+            ->assertJsonPath('data.forecasted', 1);
+
+        $this->assertSame(1, ProductForecast::query()->count());
+    }
+
+    public function test_run_endpoint_returns_503_when_the_sidecar_is_down(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        Http::fake(static function (): never {
+            throw new ConnectionException('Connection refused');
+        });
+
+        $this->postJson('/api/forecast/run')->assertStatus(503);
     }
 }

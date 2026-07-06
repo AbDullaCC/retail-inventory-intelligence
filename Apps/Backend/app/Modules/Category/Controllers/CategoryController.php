@@ -14,8 +14,7 @@ final class CategoryController extends Controller
 {
     public function __construct(
         private readonly CategoryServiceInterface $service,
-    ) {
-    }
+    ) {}
 
     public function index(): JsonResponse
     {

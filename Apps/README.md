@@ -51,6 +51,10 @@ Backend/app/Modules/
 ├── Product/                # CRUD + filtering/pagination; delegates opening stock to the Stock module
 ├── Stock/                  # adjust / history / recent; Enums/StockMovementType, Exceptions/InsufficientStockException
 ├── Dashboard/              # read-only aggregation across the other modules (+ /dashboard/trends time series)
+├── Shopify/                # connector: pulls products/orders/inventory from a Shopify store (GraphQL Admin API)
+│   ├── Support/            # ShopifyClient (GraphQL transport, throttle retry)
+│   ├── Services/           # ShopifySyncService (import, history backfill, reconciliation)
+│   └── Console/            # `shopify:sync`
 ├── Forecast/               # owns product_forecasts; talks to the Python sidecar
 │   ├── Services/           # ForecastRunner (write side), ForecastReader (read side), DemandSeriesBuilder
 │   ├── Console/            # forecast:run (refresh forecasts) · forecast:evaluate (holdout backtest)
@@ -137,7 +141,28 @@ php artisan forecast:evaluate              # optional: holdout backtest vs the l
 The app works without the sidecar — recommendations fall back to the
 14-day-average formula until forecasts exist.
 
-### 5. Frontend (`Frontend/`)
+### 5. Optional: connect a Shopify store
+
+Instead of (or alongside) the dataset, the app can run on a real Shopify store's data —
+entirely from the UI (**Settings → Integrations** in the app):
+
+1. In the Shopify admin: **Settings → Apps and sales channels → Develop apps → Create an app**.
+2. Grant the Admin API scopes `read_products`, `read_inventory`, `read_orders`
+   (add `read_all_orders` for order history older than 60 days), install the app
+   and copy the Admin API access token.
+3. In the app, open **Integrations**, paste the store domain + token and click
+   **Connect** (the token is validated live and stored encrypted).
+4. Click **Import store** — the first sync imports the catalogue (with real unit
+   costs), **backfills up to two years of order history into the ledger** and
+   reconciles stock levels; later syncs are incremental. Then click
+   **Refresh forecasts** to model the store's own sales.
+
+The same flow is scriptable via `SHOPIFY_SHOP_DOMAIN`/`SHOPIFY_ADMIN_TOKEN` in
+`Backend/.env` + `php artisan shopify:sync` + `php artisan forecast:run`.
+A free [Shopify development store](https://shopify.dev/docs/api/development-stores)
+works for demos. The connector is read-only toward Shopify — it never writes back.
+
+### 6. Frontend (`Frontend/`)
 
 ```bash
 cd Frontend

@@ -20,8 +20,7 @@ final class AuthController extends Controller
 {
     public function __construct(
         private readonly AuthServiceInterface $auth,
-    ) {
-    }
+    ) {}
 
     public function register(RegisterRequest $request): JsonResponse
     {

@@ -15,8 +15,7 @@ final class StockAdjustmentData
         public readonly StockMovementType $type,
         public readonly int $quantity,
         public readonly ?string $reason = null,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data

@@ -25,8 +25,7 @@ final class StockService implements StockServiceInterface
 {
     public function __construct(
         private readonly StockMovementMapper $mapper,
-    ) {
-    }
+    ) {}
 
     public function adjust(int $productId, StockAdjustmentData $data, ?int $userId = null): StockMovementDTO
     {

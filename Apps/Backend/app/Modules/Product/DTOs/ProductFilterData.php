@@ -21,8 +21,7 @@ final class ProductFilterData
         public readonly string $sortDir,
         public readonly int $perPage,
         public readonly int $page,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $query

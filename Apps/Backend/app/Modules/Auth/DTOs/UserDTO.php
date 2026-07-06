@@ -13,8 +13,7 @@ final class UserDTO extends BaseData
         public readonly string $name,
         public readonly string $email,
         public readonly ?string $createdAt,
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

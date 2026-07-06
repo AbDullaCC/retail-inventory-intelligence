@@ -11,8 +11,7 @@ final class LoginData extends BaseData
     public function __construct(
         public readonly string $email,
         public readonly string $password,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data

@@ -12,8 +12,7 @@ final class AuthTokenDTO extends BaseData
         public readonly string $token,
         public readonly UserDTO $user,
         public readonly string $tokenType = 'Bearer',
-    ) {
-    }
+    ) {}
 
     public function toArray(): array
     {

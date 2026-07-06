@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Tags } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Plug, Tags } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Avatar, Drawer, Tooltip, cn } from './ui'
@@ -31,6 +31,10 @@ const navGroups: NavGroup[] = [
       { to: '/products', label: 'Products', icon: Package },
       { to: '/categories', label: 'Categories', icon: Tags },
     ],
+  },
+  {
+    label: 'Settings',
+    items: [{ to: '/integrations', label: 'Integrations', icon: Plug }],
   },
 ]
 

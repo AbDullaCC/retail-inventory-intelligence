@@ -12,8 +12,7 @@ final class RegisterData extends BaseData
         public readonly string $name,
         public readonly string $email,
         public readonly string $password,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data

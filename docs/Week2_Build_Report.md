@@ -78,7 +78,7 @@ Two architectural principles matter most:
 | Barcode-assisted / manual stock entry | Could | Manual entry done; barcode not started | Stock adjustments work through the UI/API |
 | Supplier lead-time management | Could | **Not started** | Lead time is a documented 7-day default everywhere; the UI labels it as defaulted |
 | Advanced / seasonal forecasting (ML) | Won't (v1) | **Pulled forward — done** | The deliberate divergence; justified in §4 |
-| POS integration (live sync) | Won't (v1) | Not built; scoped | Shopify connector designed and estimated (§8) |
+| POS integration (live sync) | Won't (v1) | **Built (pre-Week 3)** | Shopify connector completed after this report's build window — see §8 |
 | Automated purchase orders | Won't (v1) | Not built — by design | The product recommends; the human decides |
 | Cross-branch / multi-store view | Won't (v1) | Not built — per scope | Single-location model throughout |
 
@@ -209,7 +209,7 @@ One repeatable command — `php artisan inventory:import-retail` — runs the pi
 
 **Before Week 3 starts (stretch, already scoped):** two integrations are in mind and estimated —
 
-1. a **Shopify connector** (product/inventory import and order sync via Shopify's GraphQL Admin API), turning "runs on real data" into "runs on *your* data" — the strongest possible answer to the POS-integration item Week 1 deferred; and
+1. a **Shopify connector** — **now built, with a full in-app flow**: a Settings → Integrations screen where a retailer pastes their store domain and token (validated live, stored encrypted), clicks *Import store* — which pulls the catalogue with real unit costs, backfills up to two years of order history into the ledger (feeding the forecasting models with the merchant's own sales) and reconciles stock levels — and then *Refresh forecasts*. Read-only toward Shopify, incremental after the first run, covered by its own test suite. This turns "runs on real data" into "runs on *your* data" — the strongest possible answer to the POS-integration item Week 1 deferred; and
 2. an **AI agent** that answers natural-language questions over the inventory ("What should I reorder this week? What's tying up my cash?") — the evolution of Week 1's LLM weekly-summary idea into something interactive, wrapping the same service layer the UI uses.
 
 **Week 3 (QA · Delivery Lead · Entrepreneur)**
