@@ -30,7 +30,14 @@ final class DemandSeriesBuilder
 
         $series = [];
         foreach ($daily as $productId => $days) {
-            $series[$productId] = $this->zeroFill($days, (string) array_key_first($days), $yesterday);
+            $firstDay = (string) array_key_first($days);
+            if ($firstDay > $yesterday) {
+                // First-ever sale happened today — no completed day of history
+                // yet, nothing to forecast. Intelligence falls back for it.
+                continue;
+            }
+
+            $series[$productId] = $this->zeroFill($days, $firstDay, $yesterday);
         }
 
         return $series;

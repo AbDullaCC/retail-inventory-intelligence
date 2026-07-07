@@ -262,13 +262,18 @@ export function ProductDetailPage() {
     )
   }
 
+  // The chart plots complete days only (through yesterday) — today's sales
+  // land in the ledger immediately but on the chart tomorrow.
+  const completedSales = forecast?.history.reduce((sum, point) => sum + point.qty, 0) ?? 0
   const forecastSubtitle = forecastLoading
     ? undefined
     : forecast && forecast.forecast.length > 0
       ? `${forecast.model_used ?? 'Model'} model · dashed = next ${
           forecast.horizon_days ?? forecast.forecast.length
-        } days`
-      : 'No fresh forecast — run php artisan forecast:run'
+        } days · daily history through yesterday`
+      : completedSales === 0
+        ? 'Awaiting the first full day of sales — today’s sales show in the ledger now and on this chart tomorrow.'
+        : 'No fresh forecast — use “Refresh forecasts” on the Integrations page.'
 
   return (
     <div>

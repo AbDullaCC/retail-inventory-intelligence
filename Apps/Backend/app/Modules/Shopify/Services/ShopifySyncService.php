@@ -133,11 +133,19 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
             $isActive = ($node['status'] ?? 'ACTIVE') === 'ACTIVE';
 
             foreach ($node['variants']['nodes'] ?? [] as $variant) {
-                $sku = trim((string) ($variant['sku'] ?? ''));
-                if ($sku === '') {
+                $variantGid = trim((string) ($variant['id'] ?? ''));
+                if ($variantGid === '') {
                     $stats['variants_skipped']++;
 
                     continue;
+                }
+
+                // Merchants usually assign SKUs; test/dev stores often don't.
+                // Fall back to a SKU derived from the variant id so the whole
+                // catalogue imports either way.
+                $sku = trim((string) ($variant['sku'] ?? ''));
+                if ($sku === '') {
+                    $sku = 'SHOPIFY-'.$this->numericId($variantGid);
                 }
 
                 $attrs = [
@@ -150,8 +158,7 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
                     'is_active' => $isActive,
                 ];
 
-                $variantId = (string) $variant['id'];
-                $existingProductId = $variantToProduct[$variantId] ?? null;
+                $existingProductId = $variantToProduct[$variantGid] ?? null;
 
                 if ($existingProductId !== null) {
                     Product::query()->whereKey($existingProductId)->update($attrs);
@@ -167,11 +174,11 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
                     ShopifyProductMap::query()->create([
                         'product_id' => $product->id,
                         'shopify_product_id' => (string) $node['id'],
-                        'shopify_variant_id' => $variantId,
+                        'shopify_variant_id' => $variantGid,
                         'shopify_inventory_item_id' => $variant['inventoryItem']['id'] ?? null,
                     ]);
                     $productId = (int) $product->id;
-                    $variantToProduct[$variantId] = $productId;
+                    $variantToProduct[$variantGid] = $productId;
                     $stats['products_created']++;
                 }
 
@@ -211,7 +218,10 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
             $createdAt = Carbon::parse((string) $order['createdAt']);
             $maxCreatedAt = $maxCreatedAt === null ? $createdAt : $maxCreatedAt->max($createdAt);
 
-            $imported = false;
+            // Aggregate per (order, product): one ledger row per product per
+            // order, which also makes the already-imported check reliable.
+            $orderName = (string) ($order['name'] ?? $order['id']);
+            $perProduct = [];
             foreach ($order['lineItems']['nodes'] ?? [] as $line) {
                 $variantId = $line['variant']['id'] ?? null;
                 $productId = $variantId === null ? null : ($variantToProduct[(string) $variantId] ?? null);
@@ -219,22 +229,32 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
                 if ($productId === null || $qty <= 0) {
                     continue;
                 }
-
-                $lines[] = [
-                    'product_id' => (int) $productId,
-                    'qty' => $qty,
-                    'at' => $createdAt->format('Y-m-d H:i:s'),
-                    'order' => (string) ($order['name'] ?? $order['id']),
-                ];
-                $imported = true;
+                $perProduct[(int) $productId] = ($perProduct[(int) $productId] ?? 0) + $qty;
             }
 
-            if ($imported) {
-                $stats['orders_imported']++;
+            foreach ($perProduct as $productId => $qty) {
+                $lines[] = [
+                    'product_id' => $productId,
+                    'qty' => $qty,
+                    'at' => $createdAt->format('Y-m-d H:i:s'),
+                    'order' => $orderName,
+                ];
             }
         }
 
+        // Shopify's order search rounds timestamps to the minute, so the
+        // watermark filter can re-match the newest already-imported order —
+        // drop anything the ledger already has (matched on order + product).
+        $lines = array_values(array_filter($lines, function (array $line): bool {
+            return ! StockMovement::query()
+                ->where('product_id', $line['product_id'])
+                ->where('reason', 'Shopify order '.$line['order'])
+                ->exists();
+        }));
+
         usort($lines, static fn (array $a, array $b): int => $a['at'] <=> $b['at']);
+
+        $stats['orders_imported'] = count(array_unique(array_column($lines, 'order')));
 
         if ($backfill) {
             $this->backfillLines($stats, $lines, $shopifyQuantities);
@@ -373,6 +393,13 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
             'created_at' => $at,
             'updated_at' => $at,
         ];
+    }
+
+    private function numericId(string $gid): string
+    {
+        $slash = strrpos($gid, '/');
+
+        return $slash === false ? $gid : substr($gid, $slash + 1);
     }
 
     private function categoryIdFor(string $productType): int

@@ -168,10 +168,11 @@ class ShopifySyncTest extends TestCase
 
         $stats = $this->sync();
 
-        // Products: two variants with SKUs; the blank-SKU variant is skipped.
-        $this->assertSame(2, $stats['products_created']);
-        $this->assertSame(1, $stats['variants_skipped']);
+        // All three variants import; the blank-SKU one gets a derived SKU.
+        $this->assertSame(3, $stats['products_created']);
+        $this->assertSame(0, $stats['variants_skipped']);
         $this->assertTrue($stats['backfill']);
+        $this->assertSame('Logo Tee — Small', Product::query()->where('sku', 'SHOPIFY-222')->sole()->name);
 
         $mug = Product::query()->where('sku', 'MUG-1')->sole();
         $this->assertSame('Blue Mug', $mug->name);
@@ -205,9 +206,11 @@ class ShopifySyncTest extends TestCase
         // Ledger dates are the ORDER dates (this is what the forecaster reads).
         $this->assertSame('2026-06-20 10:00:00', $movements[1]->created_at->format('Y-m-d H:i:s'));
 
-        // Ledger ends at Shopify's stock → no reconciliation needed.
-        $this->assertSame(0, $stats['inventory_adjustments']);
+        // Products with order history end exactly at Shopify's stock (no
+        // adjustment); the no-history variant is reconciled to its level.
+        $this->assertSame(1, $stats['inventory_adjustments']);
         $this->assertSame(5, $tee->refresh()->quantity);
+        $this->assertSame(9, Product::query()->where('sku', 'SHOPIFY-222')->sole()->quantity);
 
         // Watermark = newest imported order.
         $this->assertSame('2026-07-01 09:00:00', ShopifySyncState::current()->orders_synced_until->format('Y-m-d H:i:s'));
@@ -231,8 +234,8 @@ class ShopifySyncTest extends TestCase
 
         // No duplicate products or maps.
         $this->assertSame(0, $stats['products_created']);
-        $this->assertSame(2, $stats['products_updated']);
-        $this->assertSame(2, ShopifyProductMap::query()->count());
+        $this->assertSame(3, $stats['products_updated']);
+        $this->assertSame(3, ShopifyProductMap::query()->count());
         $this->assertFalse($stats['backfill']);
 
         // The new order went through the audited path, backdated to order time.
@@ -248,6 +251,31 @@ class ShopifySyncTest extends TestCase
         $this->assertSame(30, $mug->refresh()->quantity);
 
         $this->assertSame('2026-07-02 08:00:00', ShopifySyncState::current()->orders_synced_until->format('Y-m-d H:i:s'));
+    }
+
+    public function test_refetched_order_is_never_imported_twice(): void
+    {
+        // Shopify's order search rounds timestamps to the minute, so the
+        // newest imported order can come back on the next sync. Serve the SAME
+        // orders batch twice — the second run must not duplicate anything.
+        $this->fakeShopify($this->productsPayload(), [
+            $this->ordersPayload($this->historicalOrders()),
+            $this->ordersPayload($this->historicalOrders()),
+        ]);
+
+        $this->sync();
+        $stats = $this->sync();
+
+        $this->assertSame(0, $stats['orders_imported']);
+        $this->assertSame(0, $stats['order_lines_imported']);
+
+        $mug = Product::query()->where('sku', 'MUG-1')->sole();
+        $this->assertSame(
+            1,
+            StockMovement::query()->where('product_id', $mug->id)->where('reason', 'Shopify order #1001')->count(),
+            'order #1001 appears exactly once in the ledger',
+        );
+        $this->assertSame(30, $mug->refresh()->quantity);
     }
 
     public function test_conflicting_order_is_skipped_and_reconciled(): void
@@ -281,7 +309,7 @@ class ShopifySyncTest extends TestCase
 
         $stats = $this->sync(productsOnly: true);
 
-        $this->assertSame(2, $stats['products_created']);
+        $this->assertSame(3, $stats['products_created']);
         $this->assertSame(0, $stats['orders_imported']);
         $this->assertSame(0, StockMovement::query()->count());
         $this->assertNull(ShopifySyncState::current()->orders_synced_until, 'backfill still pending');
@@ -306,7 +334,7 @@ class ShopifySyncTest extends TestCase
         $stats = $this->sync();
 
         $this->assertSame(2, $calls, 'first products call throttled, second succeeded');
-        $this->assertSame(2, $stats['products_created']);
+        $this->assertSame(3, $stats['products_created']);
     }
 
     public function test_unconfigured_command_fails_with_setup_instructions(): void

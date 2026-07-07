@@ -81,12 +81,19 @@ final class ShopifyClient
         $settings = config('services.shopify');
         $url = sprintf('https://%s/admin/api/%s/graphql.json', $domain, $settings['version']);
 
+        // GraphQL `variables` must be a JSON object; an empty PHP array would
+        // serialise to [] and Shopify rejects it — omit the key instead.
+        $payload = ['query' => $query];
+        if ($variables !== []) {
+            $payload['variables'] = $variables;
+        }
+
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
             try {
                 $response = Http::withHeaders(['X-Shopify-Access-Token' => $token])
                     ->timeout((int) $settings['timeout'])
                     ->acceptJson()
-                    ->post($url, ['query' => $query, 'variables' => $variables])
+                    ->post($url, $payload)
                     ->throw()
                     ->json();
             } catch (ConnectionException $e) {

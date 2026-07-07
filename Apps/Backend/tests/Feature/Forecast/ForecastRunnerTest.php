@@ -173,6 +173,42 @@ class ForecastRunnerTest extends TestCase
         $this->assertNull(ProductForecast::query()->sole()->p90_demand_over_lead_time);
     }
 
+    public function test_product_whose_first_sale_is_today_is_skipped_not_sent_empty(): void
+    {
+        $withHistory = $this->product();
+        $this->movement($withHistory->id, 10, 2);
+
+        // First-ever sale TODAY: zero completed days of history — sending an
+        // empty series would be rejected by the sidecar (min 1 point).
+        $todayOnly = $this->product();
+        $this->movement($todayOnly->id, 5, 0);
+
+        Http::fake([
+            '*/health' => Http::response(['status' => 'ok']),
+            '*/forecast' => Http::response($this->sidecarResponse($withHistory->id)),
+        ]);
+
+        $this->artisan('forecast:run')->assertExitCode(0);
+
+        Http::assertSent(function (Request $request) use ($todayOnly): bool {
+            if (! Str::endsWith($request->url(), '/forecast')) {
+                return true; // ignore the health check
+            }
+            foreach ($request->data()['series'] as $series) {
+                if ($series['product_id'] === $todayOnly->id) {
+                    return false; // must not be sent at all
+                }
+                if (count($series['history']) === 0) {
+                    return false; // no empty series, ever
+                }
+            }
+
+            return true;
+        });
+
+        $this->assertSame(1, ProductForecast::query()->count(), 'only the product with history is forecast');
+    }
+
     public function test_unreachable_sidecar_fails_gracefully(): void
     {
         $product = $this->product();
