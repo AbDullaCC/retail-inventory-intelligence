@@ -125,6 +125,11 @@ final class ShopifySyncService implements ShopifySyncServiceInterface
      */
     private function syncProducts(array &$stats): array
     {
+        // Self-heal: table truncation (e.g. a fresh dataset import) bypasses
+        // FK cascades and can leave maps pointing at deleted products. Prune
+        // them so those variants are re-imported as new products.
+        ShopifyProductMap::query()->whereDoesntHave('product')->delete();
+
         $variantToProduct = ShopifyProductMap::query()->pluck('product_id', 'shopify_variant_id')->all();
         $quantities = [];
 

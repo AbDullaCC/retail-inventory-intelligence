@@ -7,6 +7,8 @@ namespace App\Console\Commands;
 use App\Modules\Auth\Models\User;
 use App\Modules\Category\Models\Category;
 use App\Modules\Product\Models\Product;
+use App\Modules\Shopify\Models\ShopifyProductMap;
+use App\Modules\Shopify\Models\ShopifySyncState;
 use App\Modules\Stock\Models\StockMovement;
 use Database\Seeders\RetailDataset\RetailDatasetImporter;
 use Illuminate\Console\Command;
@@ -108,8 +110,14 @@ final class ImportRetailDatasetCommand extends Command
             StockMovement::query()->truncate();
             Product::query()->truncate();
             Category::query()->truncate();
+            // Truncation skips FK cascades, so the Shopify connector state
+            // must be reset too: stale variant→product maps would point at
+            // dead ids, and a null watermark makes the next sync re-backfill
+            // the store's order history. Credentials are kept.
+            ShopifyProductMap::query()->truncate();
+            ShopifySyncState::query()->truncate();
             Schema::enableForeignKeyConstraints();
-            $this->components->warn('Truncated stock_movements, products and categories.');
+            $this->components->warn('Truncated stock_movements, products, categories and Shopify sync state.');
         }
 
         User::query()->firstOrCreate(

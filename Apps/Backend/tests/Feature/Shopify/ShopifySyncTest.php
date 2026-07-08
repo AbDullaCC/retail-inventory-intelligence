@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ShopifySyncTest extends TestCase
@@ -301,6 +302,32 @@ class ShopifySyncTest extends TestCase
         $mug = Product::query()->where('sku', 'MUG-1')->sole();
         $this->assertSame(30, $mug->quantity);
         $this->assertSame(0, StockMovement::query()->where('quantity_after', '<', 0)->count());
+    }
+
+    public function test_sync_self_heals_after_the_catalogue_was_truncated(): void
+    {
+        // A fresh dataset import truncates products with FK checks disabled,
+        // which bypasses cascades and orphans the variant→product maps. The
+        // next sync must prune them and re-import — not crash on ghost ids.
+        $this->fakeShopify($this->productsPayload(), [
+            $this->ordersPayload($this->historicalOrders()),
+            $this->ordersPayload($this->historicalOrders()),
+        ]);
+
+        $this->sync();
+
+        Schema::disableForeignKeyConstraints();
+        StockMovement::query()->truncate();
+        Product::query()->truncate();
+        Schema::enableForeignKeyConstraints();
+
+        $stats = $this->sync();
+
+        $this->assertSame(3, $stats['products_created'], 'orphaned maps pruned, products re-imported');
+        $this->assertSame(3, ShopifyProductMap::query()->count());
+        $this->assertSame(0, StockMovement::query()->where('quantity_after', '<', 0)->count());
+        // Quantities end at Shopify's levels either way (reconcile pass).
+        $this->assertSame(30, Product::query()->where('sku', 'MUG-1')->sole()->quantity);
     }
 
     public function test_products_only_flag_skips_orders_and_inventory(): void

@@ -81,7 +81,9 @@
       "Bash(./vendor/bin/pint app/Modules tests --quiet)",
       "Bash(./vendor/bin/pint app/Support app/Modules --quiet)",
       "Bash(python -c \"import json,sys; spec=json.load\\(sys.stdin\\); print\\('spec valid, paths:', len\\(spec['paths']\\)\\)\")",
-      "Bash(./vendor/bin/pint app/Modules/Shopify --quiet)"
+      "Bash(./vendor/bin/pint app/Modules/Shopify --quiet)",
+      "Bash(./vendor/bin/pint app/Console app/Modules/Shopify tests/Feature/Shopify --quiet)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('message'\\)\\); print\\(d['data']['stats']\\)\")"
     ]
   }
 }
