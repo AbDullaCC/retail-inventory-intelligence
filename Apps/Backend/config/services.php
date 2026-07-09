@@ -55,4 +55,22 @@ return [
         'stale_after_hours' => 48,
     ],
 
+    // AI chatbot (read-only Q&A agent) — see app/Modules/Chatbot.
+    'chatbot' => [
+        'provider' => env('LLM_PROVIDER', 'gemini'),
+        'gemini' => [
+            'api_key' => env('GEMINI_API_KEY'),
+            'model' => env('GEMINI_MODEL', 'gemini-3.5-flash'),
+            'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+            'timeout' => (int) env('GEMINI_TIMEOUT', 30),
+        ],
+        'max_tokens' => (int) env('CHATBOT_MAX_TOKENS', 2048),
+        'temperature' => 0.2,
+        'max_history_messages' => 12,
+        'max_tool_iterations' => 5,
+        'max_tool_result_items' => 20,
+        'rate_limit_per_hour' => (int) env('CHATBOT_RATE_LIMIT_PER_HOUR', 30),
+        'system_prompt' => env('CHATBOT_SYSTEM_PROMPT'),
+    ],
+
 ];

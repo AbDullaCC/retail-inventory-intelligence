@@ -10,4 +10,5 @@ return [
     App\Modules\Shopify\Providers\ShopifyServiceProvider::class,
     App\Modules\Forecast\Providers\ForecastServiceProvider::class,
     App\Modules\Intelligence\Providers\IntelligenceServiceProvider::class,
+    App\Modules\Chatbot\Providers\ChatbotServiceProvider::class,
 ];

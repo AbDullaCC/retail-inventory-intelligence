@@ -36,6 +36,7 @@ final class OpenApiSpec
                 ['name' => 'Intelligence', 'description' => 'Reorder & overstock recommendations derived from sales history.'],
                 ['name' => 'Forecast', 'description' => 'Time-series demand forecasts (statsforecast sidecar) for charting.'],
                 ['name' => 'Shopify', 'description' => 'Store connector: read-only import of products, orders and inventory.'],
+                ['name' => 'Chatbot', 'description' => 'Read-only AI assistant over inventory data.'],
             ],
             'security' => [['bearerAuth' => []]],
             'paths' => self::paths(),
@@ -318,6 +319,50 @@ final class OpenApiSpec
                         '401' => self::ref('Unauthorized'),
                         '404' => self::ref('NotFound'),
                         '422' => self::ref('ValidationError'),
+                    ],
+                ],
+            ],
+
+            '/api/chat/threads' => [
+                'get' => [
+                    'tags' => ['Chatbot'],
+                    'summary' => 'List the current user\'s chat threads',
+                    'responses' => ['200' => self::listResponse('ChatThread'), '401' => self::ref('Unauthorized')],
+                ],
+                'post' => [
+                    'tags' => ['Chatbot'],
+                    'summary' => 'Create a new chat thread',
+                    'requestBody' => self::body('CreateThreadInput'),
+                    'responses' => [
+                        '201' => self::dataResponse('ChatThread', 'Thread created'),
+                        '401' => self::ref('Unauthorized'),
+                        '422' => self::ref('ValidationError'),
+                    ],
+                ],
+            ],
+            '/api/chat/threads/{thread}' => [
+                'get' => [
+                    'tags' => ['Chatbot'],
+                    'summary' => 'Get a thread with its messages',
+                    'parameters' => [self::idParam('thread')],
+                    'responses' => [
+                        '200' => self::dataResponse('ChatThread'),
+                        '401' => self::ref('Unauthorized'),
+                        '404' => self::ref('NotFound'),
+                    ],
+                ],
+            ],
+            '/api/chat/messages' => [
+                'post' => [
+                    'tags' => ['Chatbot'],
+                    'summary' => 'Ask the assistant (creates a thread when thread_id is omitted)',
+                    'requestBody' => self::body('SendMessageInput'),
+                    'responses' => [
+                        '200' => self::dataResponse('ChatAnswer'),
+                        '401' => self::ref('Unauthorized'),
+                        '422' => self::ref('ValidationError'),
+                        '429' => self::json('Too many messages this hour.', ['message' => ['type' => 'string']]),
+                        '503' => self::messageResponse(),
                     ],
                 ],
             ],
@@ -766,6 +811,59 @@ final class OpenApiSpec
                     'type' => ['type' => 'string', 'enum' => ['in', 'out', 'adjustment'], 'example' => 'in'],
                     'quantity' => ['type' => 'integer', 'minimum' => 0, 'example' => 25],
                     'reason' => ['type' => 'string', 'nullable' => true, 'example' => 'Restock'],
+                ],
+            ],
+
+            'ChatThread' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'user_id' => ['type' => 'integer'],
+                    'title' => ['type' => 'string'],
+                    'message_count' => ['type' => 'integer'],
+                    'last_message_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    'created_at' => ['type' => 'string', 'format' => 'date-time'],
+                    'messages' => ['type' => 'array', 'nullable' => true, 'items' => self::schemaRef('ChatMessage'), 'description' => 'Populated only on the thread show path; null on the list path.'],
+                ],
+            ],
+            'ChatMessage' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'thread_id' => ['type' => 'integer'],
+                    'role' => ['type' => 'string', 'enum' => ['user', 'assistant']],
+                    'content' => ['type' => 'string'],
+                    'tool_calls' => ['type' => 'array', 'nullable' => true, 'items' => self::schemaRef('ChatToolCall'), 'description' => 'Assistant messages only: the read tools invoked, truncated for display.'],
+                    'created_at' => ['type' => 'string', 'format' => 'date-time'],
+                ],
+            ],
+            'ChatToolCall' => [
+                'type' => 'object',
+                'properties' => [
+                    'name' => ['type' => 'string', 'description' => 'Tool name, e.g. get_reorder_recommendations.'],
+                    'args' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Arguments the model passed.'],
+                    'result_summary' => ['type' => 'string', 'description' => 'Short human-readable summary of the result.'],
+                ],
+            ],
+            'ChatAnswer' => [
+                'type' => 'object',
+                'properties' => [
+                    'thread' => self::schemaRef('ChatThread'),
+                    'message' => self::schemaRef('ChatMessage'),
+                ],
+            ],
+            'SendMessageInput' => [
+                'type' => 'object',
+                'required' => ['message'],
+                'properties' => [
+                    'message' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 2000, 'example' => 'What should I reorder this week?'],
+                    'thread_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Existing thread id; omitted to start a new thread.'],
+                ],
+            ],
+            'CreateThreadInput' => [
+                'type' => 'object',
+                'properties' => [
+                    'title' => ['type' => 'string', 'maxLength' => 120, 'nullable' => true],
                 ],
             ],
         ];
