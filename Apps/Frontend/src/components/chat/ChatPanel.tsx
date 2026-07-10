@@ -71,10 +71,11 @@ export function ChatPanel() {
         const status = (err as { response?: { status?: number } }).response?.status
         if (status === 429) {
           toast.error("You've sent too many messages this hour. Please try again later.")
-        } else if (status === 503) {
-          setError('The assistant is unavailable right now. Check the API key or try again.')
         } else {
-          setError(apiErrorMessage(err, 'Could not send your message. Please try again.'))
+          // The backend surfaces the real Gemini error verbatim in `message`
+          // (e.g. "Gemini API error (HTTP 503): This model is currently
+          // experiencing high demand…"). Show that — it's the actual cause.
+          setError(apiErrorMessage(err, 'The assistant is unavailable right now. Please try again.'))
         }
       } finally {
         setLoading(false)

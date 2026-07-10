@@ -87,7 +87,8 @@
       "Bash(./vendor/bin/phpunit --filter test_parses_a_text_only_response tests/Feature/Chatbot/GeminiLlmClientTest.php)",
       "Bash(./vendor/bin/phpunit --filter test_parses_a_text_only_response tests/Feature/Chatbot/GeminiLlmClientTest.php --log-junit /tmp/chatbot-test.xml)",
       "Read(//tmp/**)",
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "Bash(grep -rhoE ''\\\\''\\(oneOf|anyOf|allOf|format|$ref|pattern|exclusiveMinimum|exclusiveMaximum|multipleOf|minItems|maxItems|minLength|maxLength\\)'\\\\''\\\\s*=>' app/Modules/Chatbot/Services/Tools/)"
     ]
   }
 }

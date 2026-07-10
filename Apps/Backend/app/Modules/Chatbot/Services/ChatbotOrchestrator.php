@@ -82,9 +82,12 @@ final class ChatbotOrchestrator
                 ];
             }
 
-            // Echo the model's functionCall turn back as an assistant message,
-            // then the function responses under a user message (Gemini's role
-            // rule). This lets the model see the call/result pairing.
+            // Echo the model's tool-call turn back as an assistant message, then
+            // the function responses under a user message (Gemini's role rule).
+            // When the provider supplied raw parts (Gemini 3.x thought parts
+            // carrying a thoughtSignature that MUST travel with the
+            // functionCall), echo those verbatim — reconstructing only the
+            // functionCalls would drop the signature and the API 400s.
             $messages[] = $this->assistantFunctionCallMessage($response);
             $messages[] = new LlmMessage('user', $responseParts);
         }
@@ -127,11 +130,21 @@ final class ChatbotOrchestrator
     }
 
     /**
-     * Reconstruct the model's function-call turn as an assistant message so the
-     * call/result pairing is preserved in the conversation history.
+     * Reconstruct the model's tool-call turn as an assistant message so the
+     * call/result pairing is preserved in the conversation history. When the
+     * provider supplied raw parts, echo those verbatim (Gemini 3.x thought
+     * parts + their thoughtSignature must accompany the functionCall on the
+     * next request); otherwise fall back to rebuilding from the parsed calls.
      */
     private function assistantFunctionCallMessage(LlmResponse $response): LlmMessage
     {
+        if ($response->rawParts !== []) {
+            return new LlmMessage(
+                'assistant',
+                array_map(static fn (array $raw): LlmPart => LlmPart::raw($raw), $response->rawParts),
+            );
+        }
+
         $parts = [];
         foreach ($response->functionCalls as $call) {
             $parts[] = LlmPart::functionCall($call['name'], $call['args']);

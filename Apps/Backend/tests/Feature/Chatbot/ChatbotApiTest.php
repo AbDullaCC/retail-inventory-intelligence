@@ -119,8 +119,11 @@ class ChatbotApiTest extends TestCase
         $this->fakeLlmThrowing(new ChatbotServiceUnavailableException('down', 503));
         \Laravel\Sanctum\Sanctum::actingAs($user = User::factory()->create());
 
+        // The exception message surfaces verbatim in the JSON body so the UI can
+        // show the real Gemini cause instead of a generic "unavailable" string.
         $this->postJson('/api/chat/messages', ['message' => 'please answer'])
-            ->assertStatus(503);
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'down');
 
         // Two-transaction design: the user message persists; only the reply failed.
         $this->assertDatabaseHas('chat_messages', ['role' => 'user', 'content' => 'please answer']);

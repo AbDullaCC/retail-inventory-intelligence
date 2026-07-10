@@ -100,6 +100,37 @@ class ChatbotOrchestratorTest extends TestCase
         $this->assertStringContainsString('Based on the data I retrieved', $result->text);
     }
 
+    public function test_echoes_provider_raw_parts_when_present_so_thought_signatures_survive(): void
+    {
+        // Gemini 3.x returns thought parts (carrying a thoughtSignature) next
+        // to the functionCall; they must be echoed back verbatim on the next
+        // request or the API 400s with "missing a thought_signature".
+        $rawParts = [
+            ['text' => 'Let me look that up.', 'thought' => true, 'thoughtSignature' => 'sig-abc'],
+            ['functionCall' => ['name' => 'echo', 'args' => ['msg' => 'world']]],
+        ];
+
+        $client = new FakeLlmClient([
+            new LlmResponse(text: null, functionCalls: [['name' => 'echo', 'args' => ['msg' => 'world']]], finishReason: 'STOP', rawParts: $rawParts),
+            new LlmResponse(text: 'Done.', functionCalls: [], finishReason: 'STOP'),
+        ]);
+
+        $result = $this->orchestrator($client)->run([], 'echo world');
+
+        $this->assertSame('Done.', $result->text);
+
+        // The second request (after the tool ran) must contain the raw model
+        // turn as an assistant message with the thought part + signature intact.
+        $second = $client->requests[1];
+        $this->assertCount(3, $second->messages); // history-text + assistant(raw) + user(responses)
+
+        $assistantTurn = $second->messages[1];
+        $this->assertSame('assistant', $assistantTurn->role);
+        $this->assertCount(2, $assistantTurn->parts);
+        $this->assertNotNull($assistantTurn->parts[0]->raw);
+        $this->assertSame('sig-abc', $assistantTurn->parts[0]->raw['thoughtSignature'] ?? null);
+    }
+
     private function orchestrator(FakeLlmClient $client, int $maxIterations = 5): ChatbotOrchestrator
     {
         $echo = new ChatbotTool(

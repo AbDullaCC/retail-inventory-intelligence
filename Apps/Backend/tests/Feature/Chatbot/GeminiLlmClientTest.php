@@ -104,6 +104,28 @@ class GeminiLlmClientTest extends TestCase
         $this->client()->generate($this->request());
     }
 
+    public function test_surfaces_gemini_actual_error_message_verbatim(): void
+    {
+        // Mirrors the real "model overloaded" response — the user must see this
+        // text, not a generic "unavailable" string, so they know it's transient.
+        $this->fakeGenerate([
+            'error' => [
+                'code' => 503,
+                'message' => 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+                'status' => 'UNAVAILABLE',
+            ],
+        ], 503);
+
+        try {
+            $this->client()->generate($this->request());
+            $this->fail('Expected ChatbotServiceUnavailableException.');
+        } catch (ChatbotServiceUnavailableException $e) {
+            $this->assertSame(503, $e->status());
+            $this->assertStringContainsString('HTTP 503', $e->getMessage());
+            $this->assertStringContainsString('high demand', $e->getMessage());
+        }
+    }
+
     public function test_surfaces_503_on_connection_failure(): void
     {
         Http::fake(static fn () => throw new ConnectionException('Connection refused'));
@@ -127,6 +149,48 @@ class GeminiLlmClientTest extends TestCase
             $body = $httpRequest->data();
 
             return ($body['toolConfig']['functionCallingConfig']['mode'] ?? null) === 'NONE';
+        });
+    }
+
+    public function test_strips_gemini_unsupported_schema_keys_from_function_declarations(): void
+    {
+        // `additionalProperties` is valid JSON Schema but Gemini rejects it with
+        // HTTP 400 "Unknown name 'additionalProperties'". The local validator
+        // still sees it, but the outbound payload must not.
+        $this->fakeGenerate([
+            'candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => 'done']]]]],
+        ]);
+
+        $tool = [
+            'name' => 'get_product',
+            'description' => 'one product',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'product_id' => ['type' => 'integer', 'minimum' => 1],
+                    'nested' => [
+                        'type' => 'object',
+                        'properties' => ['x' => ['type' => 'integer']],
+                        'additionalProperties' => false,
+                    ],
+                ],
+                'required' => ['product_id'],
+                'additionalProperties' => false,
+                '$schema' => 'http://json-schema.org/draft-07/schema#',
+            ],
+        ];
+
+        $this->client()->generate(new LlmRequest('sys', [LlmMessage::text('user', 'hi')], [$tool], 'auto'));
+
+        Http::assertSent(function ($httpRequest): bool {
+            $decls = $httpRequest->data()['tools'][0]['functionDeclarations'] ?? [];
+            $params = $decls[0]['parameters'] ?? [];
+
+            // Top-level unsupported keys gone, but required + properties survive.
+            return ! array_key_exists('additionalProperties', $params)
+                && ! array_key_exists('$schema', $params)
+                && $params['required'] === ['product_id']
+                && ! array_key_exists('additionalProperties', $params['properties']['nested']);
         });
     }
 

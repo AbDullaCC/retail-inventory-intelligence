@@ -60,7 +60,10 @@ return [
         'provider' => env('LLM_PROVIDER', 'gemini'),
         'gemini' => [
             'api_key' => env('GEMINI_API_KEY'),
-            'model' => env('GEMINI_MODEL', 'gemini-3.5-flash'),
+            // gemini-3.1-flash-lite is the current default — gemini-3.5-flash is
+            // often overloaded (HTTP 503 "high demand"), and gemini-2.5-flash is
+            // deprecated. Model is env-configurable so rotation is a config change.
+            'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
             'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
             'timeout' => (int) env('GEMINI_TIMEOUT', 30),
         ],

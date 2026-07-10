@@ -22,4 +22,14 @@ final class ChatbotServiceUnavailableException extends DomainException
             $previous,
         );
     }
+
+    /**
+     * Surface Gemini's actual error message (passed through from the response
+     * body) so the UI can show the real cause — e.g. "This model is currently
+     * experiencing high demand", "API key not valid", "models/x is not found".
+     */
+    public static function fromGemini(string $message, int $status = 503, ?Throwable $previous = null): self
+    {
+        return new self($message, $status, $previous);
+    }
 }

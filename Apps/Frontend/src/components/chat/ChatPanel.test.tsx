@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import axios from 'axios'
 import { ChatPanel } from './ChatPanel'
 import type { ChatAnswer } from '../../types'
 
@@ -82,15 +83,26 @@ describe('ChatPanel', () => {
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
   })
 
-  it('shows a 503 error state when the assistant is unavailable', async () => {
-    mockedSend.mockRejectedValueOnce({ response: { status: 503 } })
+  it('shows the real Gemini error message on a 503', async () => {
+    // The backend surfaces the actual Gemini cause in `message`; the UI must
+    // show that verbatim instead of a generic "unavailable" string. A real
+    // AxiosError is used so apiErrorMessage recognises it as an axios error.
+    const err = new axios.AxiosError(
+      'Request failed with status code 503',
+      'ERR_BAD_RESPONSE',
+      undefined,
+      undefined,
+      {
+        status: 503,
+        data: { message: 'Gemini API error (HTTP 503): This model is currently experiencing high demand.' },
+      } as never,
+    )
+    mockedSend.mockRejectedValueOnce(err)
 
     render(<ChatPanel />)
     fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'hi' } })
     fireEvent.keyDown(screen.getByLabelText('Message'), { key: 'Enter' })
 
-    await waitFor(() =>
-      expect(screen.getByText(/The assistant is unavailable right now/)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/high demand/)).toBeInTheDocument())
   })
 })
