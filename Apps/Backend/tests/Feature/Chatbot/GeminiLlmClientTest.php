@@ -124,7 +124,7 @@ class GeminiLlmClientTest extends TestCase
         $this->client()->generate($request);
 
         Http::assertSent(function ($httpRequest): bool {
-            $body = json_decode($httpRequest->data(), true);
+            $body = $httpRequest->data();
 
             return ($body['toolConfig']['functionCallingConfig']['mode'] ?? null) === 'NONE';
         });
@@ -145,7 +145,7 @@ class GeminiLlmClientTest extends TestCase
         $this->client()->generate(new LlmRequest('sys', $messages, [], 'auto'));
 
         Http::assertSent(function ($httpRequest): bool {
-            $body = json_decode($httpRequest->data(), true);
+            $body = $httpRequest->data();
             $roles = array_column($body['contents'], 'role');
 
             return $roles === ['user', 'model', 'user'];
@@ -155,7 +155,10 @@ class GeminiLlmClientTest extends TestCase
     /** @param array<string, mixed> $body */
     private function fakeGenerate(array $body, int $status = 200): void
     {
-        Http::fake(['#generateContent$#i' => Http::response($body, $status)]);
+        // Http::fake() matches URL keys with Str::is() (glob `*`), NOT regex —
+        // a `#...#` regex key never matches and the request leaks to the real
+        // Gemini endpoint. Glob-match the generateContent path instead.
+        Http::fake(['*generateContent' => Http::response($body, $status)]);
     }
 
     /** @param list<array{0: array<string, mixed>, 1: int}> $responses */
@@ -165,6 +168,6 @@ class GeminiLlmClientTest extends TestCase
         foreach ($responses as [$body, $status]) {
             $sequence->push($body, $status);
         }
-        Http::fake(['#generateContent$#i' => $sequence]);
+        Http::fake(['*generateContent' => $sequence]);
     }
 }

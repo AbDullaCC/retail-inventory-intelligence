@@ -136,12 +136,13 @@ final class GeminiLlmClient implements LlmClientInterface
                     $request->tools,
                 )],
             ];
+        }
 
-            // 'none' disables function calling — forces a text answer for the
-            // final fallback call at the iteration cap.
-            if ($request->toolMode === 'none') {
-                $payload['toolConfig'] = ['functionCallingConfig' => ['mode' => 'NONE']];
-            }
+        // 'none' disables function calling — forces a text answer for the
+        // final fallback call at the iteration cap. Emitted independently of the
+        // tools block so an explicit "no tools" intent always reaches the model.
+        if ($request->toolMode === 'none') {
+            $payload['toolConfig'] = ['functionCallingConfig' => ['mode' => 'NONE']];
         }
 
         return $payload;

@@ -1,0 +1,3 @@
+
+Parse error: syntax error, unexpected string content "$k=getenv(GEMINI_API_KEY)?:;fo...", expecting end of file in Command line code on line 1
+
