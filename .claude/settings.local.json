@@ -83,7 +83,17 @@
       "Bash(python -c \"import json,sys; spec=json.load\\(sys.stdin\\); print\\('spec valid, paths:', len\\(spec['paths']\\)\\)\")",
       "Bash(./vendor/bin/pint app/Modules/Shopify --quiet)",
       "Bash(./vendor/bin/pint app/Console app/Modules/Shopify tests/Feature/Shopify --quiet)",
-      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('message'\\)\\); print\\(d['data']['stats']\\)\")"
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('message'\\)\\); print\\(d['data']['stats']\\)\")",
+      "PowerShell(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 5173, 8000, 8100 } | Select-Object LocalPort, OwningProcess | Sort-Object LocalPort -Unique)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(cat \"C:/Users/Bcc/AppData/Local/Temp/claude/D--GitHub-retail-inventory-intelligence/42d69692-4436-4fb0-a04e-b2c04fd0beb7/scratchpad/api-token.txt\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/intelligence/recommendations)",
+      "PowerShell(git -C D:\\\\GitHub\\\\retail-inventory-intelligence log --date=format:'%Y-%m-%d %a' --pretty=format:'%ad | %h | %s' -25)",
+      "PowerShell(git -C D:\\\\GitHub\\\\retail-inventory-intelligence status --short)",
+      "PowerShell(php -v)",
+      "PowerShell(php --ri opcache 2>&1)",
+      "PowerShell(Get-Process -Id 16152)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId = 16152\")"
     ]
   }
 }

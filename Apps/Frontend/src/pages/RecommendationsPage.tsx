@@ -1,11 +1,24 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Archive, Info, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import {
+  AlertTriangle,
+  Archive,
+  CheckCircle2,
+  Info,
+  Search,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react'
 import { intelligenceApi } from '../api/intelligence'
 import { apiErrorMessage } from '../lib/api'
 import { formatCurrency, formatDelta, formatNumber, formatShortDate } from '../lib/format'
-import { perWeek, recommendationPresentation, reorderByLabel } from '../lib/recommendation'
+import {
+  compareBySeverity,
+  perWeek,
+  recommendationPresentation,
+  reorderByLabel,
+} from '../lib/recommendation'
 import { usePageTitle } from '../lib/usePageTitle'
 import {
   Badge,
@@ -13,6 +26,7 @@ import {
   ChartSkeleton,
   cn,
   EmptyState,
+  Input,
   PageHeader,
   SegmentedControl,
   StatCard,
@@ -25,7 +39,7 @@ import {
   THead,
   Tooltip,
 } from '../components/ui'
-import type { SegmentedOption } from '../components/ui'
+import type { SegmentedOption, SortDir } from '../components/ui'
 import type {
   Recommendation,
   RecommendationType,
@@ -59,6 +73,25 @@ const rowTint: Record<RecommendationType, string> = {
   healthy: 'border-l-success-600',
 }
 
+type SortKey = 'trend' | 'stock' | 'velocity' | 'cover' | 'order' | 'cash'
+
+function sortValue(rec: Recommendation, key: SortKey): number | null {
+  switch (key) {
+    case 'trend':
+      return rec.demand_trend_pct
+    case 'stock':
+      return rec.current_stock
+    case 'velocity':
+      return rec.sales_velocity
+    case 'cover':
+      return rec.days_of_stock_left
+    case 'order':
+      return rec.needs_reorder ? rec.suggested_reorder_qty : null
+    case 'cash':
+      return rec.cash_tied_up > 0 ? rec.cash_tied_up : null
+  }
+}
+
 function TrendChip({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="text-slate-400">—</span>
   const up = pct >= 0
@@ -84,6 +117,8 @@ function coverLabel(rec: Recommendation): string {
   return `${Math.round(rec.days_of_stock_left)}d`
 }
 
+const URGENT_PREVIEW = 5
+
 export function RecommendationsPage() {
   usePageTitle('Recommendations')
   const navigate = useNavigate()
@@ -91,6 +126,8 @@ export function RecommendationsPage() {
   const [summary, setSummary] = useState<RecommendationsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('reorder')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null)
 
   useEffect(() => {
     intelligenceApi
@@ -100,25 +137,75 @@ export function RecommendationsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const visible = useMemo(() => {
+  /** Clicking a KPI card applies its filter; clicking it again shows everything. */
+  const toggleFilter = (next: RecommendationType) => {
+    setFilter((current) => (current === next ? 'all' : next))
+  }
+
+  /** asc → desc (cover starts asc: shortest cover is the alarming one), third click back to severity order. */
+  const toggleSort = (key: SortKey) => {
+    setSort((current) => {
+      const first: SortDir = key === 'cover' ? 'asc' : 'desc'
+      if (!current || current.key !== key) return { key, dir: first }
+      if (current.dir === first) return { key, dir: first === 'asc' ? 'desc' : 'asc' }
+      return null
+    })
+  }
+
+  const rows = useMemo(() => {
     if (!summary) return []
-    if (filter === 'all') return summary.recommendations
-    return summary.recommendations.filter((r) => r.type === filter)
-  }, [summary, filter])
+    let list = summary.recommendations
+    if (filter !== 'all') list = list.filter((r) => r.type === filter)
+    const q = query.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.sku.toLowerCase().includes(q) ||
+          (r.category_name?.toLowerCase().includes(q) ?? false),
+      )
+    }
+    const sorted = [...list]
+    if (sort) {
+      const { key, dir } = sort
+      sorted.sort((a, b) => {
+        const av = sortValue(a, key)
+        const bv = sortValue(b, key)
+        if (av === null && bv === null) return 0
+        if (av === null) return 1
+        if (bv === null) return -1
+        return dir === 'asc' ? av - bv : bv - av
+      })
+    } else {
+      sorted.sort(compareBySeverity)
+    }
+    return sorted
+  }, [summary, filter, query, sort])
 
   const urgent = useMemo(
     () => (summary ? summary.recommendations.filter((r) => r.is_urgent) : []),
     [summary],
   )
 
-  const cashItems = useMemo(() => {
-    if (!summary) return []
-    return [...summary.recommendations]
-      .filter((r) => r.cash_tied_up > 0)
-      .sort((a, b) => b.cash_tied_up - a.cash_tied_up)
-      .slice(0, 8)
-      .map((r) => ({ productId: r.product_id, name: r.name, value: r.cash_tied_up }))
-  }, [summary])
+  const overstockCash = useMemo(
+    () =>
+      summary
+        ? summary.recommendations
+            .filter((r) => r.type === 'overstock')
+            .reduce((sum, r) => sum + r.cash_tied_up, 0)
+        : 0,
+    [summary],
+  )
+
+  const cashItems = useMemo(
+    () =>
+      rows
+        .filter((r) => r.cash_tied_up > 0)
+        .sort((a, b) => b.cash_tied_up - a.cash_tied_up)
+        .slice(0, 8)
+        .map((r) => ({ productId: r.product_id, name: r.name, value: r.cash_tied_up })),
+    [rows],
+  )
 
   if (loading) {
     return (
@@ -159,14 +246,20 @@ export function RecommendationsPage() {
     { value: 'healthy', label: 'Healthy', count: summary.healthy_count },
   ]
 
+  const showVerdict = filter === 'all'
+  const showReorderCols = filter === 'all' || filter === 'reorder'
+  const showCashCol = filter === 'all' || filter === 'overstock' || filter === 'dead_stock'
+
+  const dirFor = (key: SortKey): SortDir | null => (sort?.key === key ? sort.dir : null)
+
   return (
     <div>
       <PageHeader
         title="Recommendations"
         description={
           <span className="inline-flex flex-wrap items-center gap-1.5">
-            Model-driven demand guidance · {formatNumber(summary.forecasted_count)} of{' '}
-            {formatNumber(total)} products forecasted
+            What to order, what to trim, and where cash is stuck ·{' '}
+            {formatNumber(summary.forecasted_count)} of {formatNumber(total)} products forecasted
             <Tooltip
               content={`Lead time defaults to ${summary.default_lead_time_days} days. Products without a fresh forecast fall back to the ${summary.velocity_window_days}-day average.`}
             >
@@ -177,39 +270,66 @@ export function RecommendationsPage() {
       />
 
       <div className="space-y-6">
+        {/* KPI cards double as filters — click to focus the list, click again for all. */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Need reorder"
             value={formatNumber(summary.reorder_count)}
             tone="danger"
             icon={<TrendingDown className="h-5 w-5" />}
+            hint={urgent.length > 0 ? `${formatNumber(urgent.length)} to order today` : 'none urgent'}
+            onClick={() => toggleFilter('reorder')}
+            active={filter === 'reorder'}
           />
           <StatCard
             label="Overstocked"
             value={formatNumber(summary.overstock_count)}
             tone="warning"
             icon={<AlertTriangle className="h-5 w-5" />}
+            hint={`${formatCurrency(overstockCash)} tied up`}
+            onClick={() => toggleFilter('overstock')}
+            active={filter === 'overstock'}
           />
           <StatCard
             label="Dead stock"
             value={formatNumber(summary.dead_stock_count)}
             icon={<Archive className="h-5 w-5" />}
             hint={`${formatCurrency(summary.dead_stock_cash_recoverable)} recoverable`}
+            onClick={() => toggleFilter('dead_stock')}
+            active={filter === 'dead_stock'}
           />
           <StatCard
-            label="Cash tied up"
-            value={formatCurrency(summary.total_cash_tied_up)}
-            icon={<Wallet className="h-5 w-5" />}
+            label="Healthy"
+            value={formatNumber(summary.healthy_count)}
+            tone="success"
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            hint="no action needed"
+            onClick={() => toggleFilter('healthy')}
+            active={filter === 'healthy'}
           />
         </div>
 
         {urgent.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">Order today</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {urgent.map((rec) => (
-                <Card key={rec.product_id} className="border-l-4 border-l-danger-600 p-4">
-                  <div className="flex items-start justify-between gap-2">
+          <Card className="border-l-4 border-l-danger-600">
+            <div className="px-5 py-4">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="inline-flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-danger-600" />
+                  <h2 className="text-sm font-semibold text-slate-900">Order today</h2>
+                </span>
+                <span className="text-xs text-slate-500">
+                  {urgent.length === 1
+                    ? 'this product runs'
+                    : `these ${formatNumber(urgent.length)} products run`}{' '}
+                  out before new stock could arrive
+                </span>
+              </div>
+              <ul className="mt-1 divide-y divide-slate-100">
+                {urgent.slice(0, URGENT_PREVIEW).map((rec) => (
+                  <li
+                    key={rec.product_id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5"
+                  >
                     <div className="min-w-0">
                       <Link
                         to={`/products/${rec.product_id}`}
@@ -217,31 +337,43 @@ export function RecommendationsPage() {
                       >
                         {rec.name}
                       </Link>
-                      <p className="font-mono text-xs text-slate-400">{rec.sku}</p>
+                      <span className="ml-2 font-mono text-xs text-slate-400">{rec.sku}</span>
                     </div>
-                    {rec.stockout_risk && <RiskBadge risk={rec.stockout_risk} />}
-                  </div>
-                  <p className="mt-2 text-sm text-slate-700">
-                    Order <span className="font-bold">{formatNumber(rec.suggested_reorder_qty)}</span>{' '}
-                    units today
-                  </p>
-                  {rec.projected_stockout_date && (
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      runs out ~{formatShortDate(rec.projected_stockout_date)}
-                    </p>
-                  )}
-                </Card>
-              ))}
+                    <div className="flex items-center gap-4">
+                      {rec.projected_stockout_date && (
+                        <span className="text-xs text-slate-500">
+                          runs out ~{formatShortDate(rec.projected_stockout_date)}
+                        </span>
+                      )}
+                      <span className="text-sm text-slate-700">
+                        Order{' '}
+                        <span className="font-semibold tabular-nums">
+                          {formatNumber(rec.suggested_reorder_qty)}
+                        </span>{' '}
+                        units
+                      </span>
+                      {rec.stockout_risk && <RiskBadge risk={rec.stockout_risk} />}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {urgent.length > URGENT_PREVIEW && (
+                <button
+                  type="button"
+                  onClick={() => setFilter('reorder')}
+                  className="mt-2 text-xs font-medium text-brand-700 hover:underline"
+                >
+                  Show all {formatNumber(urgent.length)} urgent products in the list below
+                </button>
+              )}
             </div>
-          </section>
+          </Card>
         )}
 
-        <SegmentedControl options={filterOptions} value={filter} onChange={setFilter} />
-
-        {summary.overstock_count > 0 && cashItems.length > 0 && (
+        {(filter === 'overstock' || filter === 'dead_stock') && cashItems.length > 0 && (
           <Card
-            title="Where cash is tied up"
-            subtitle="Top products by cash locked in excess stock — click a bar to open the product"
+            title={filter === 'overstock' ? 'Where cash is tied up' : 'Recoverable cash in dead stock'}
+            subtitle="Top products by cash locked in stock — click a bar to open the product"
           >
             <div className="p-4">
               <Suspense fallback={<ChartSkeleton height={260} />}>
@@ -251,44 +383,84 @@ export function RecommendationsPage() {
           </Card>
         )}
 
-        {visible.length === 0 ? (
-          <Card>
-            <EmptyState title="Nothing here" message={emptyCopy[filter]} />
-          </Card>
-        ) : (
-          <Card>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <SegmentedControl options={filterOptions} value={filter} onChange={setFilter} />
+            <div className="relative w-64 max-w-full">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                className="pl-9"
+                placeholder="Search name, SKU or category…"
+                aria-label="Search recommendations"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              title="Nothing here"
+              message={query ? `No products match “${query}”.` : emptyCopy[filter]}
+            />
+          ) : (
             <Table>
               <THead>
-                <TH>Verdict</TH>
+                {showVerdict && <TH>Verdict</TH>}
                 <TH>Product</TH>
-                <TH>Trend</TH>
-                <TH>Risk</TH>
-                <TH align="right">On hand</TH>
-                <TH align="right">Sales/wk</TH>
-                <TH align="right">Cover</TH>
-                <TH align="right">Order</TH>
-                <TH>By</TH>
-                <TH align="right">Cash tied up</TH>
+                <TH sortable sortDir={dirFor('trend')} onSort={() => toggleSort('trend')}>
+                  Trend
+                </TH>
+                {showReorderCols && <TH>Risk</TH>}
+                <TH align="right" sortable sortDir={dirFor('stock')} onSort={() => toggleSort('stock')}>
+                  On hand
+                </TH>
+                <TH
+                  align="right"
+                  sortable
+                  sortDir={dirFor('velocity')}
+                  onSort={() => toggleSort('velocity')}
+                >
+                  Sales/wk
+                </TH>
+                <TH align="right" sortable sortDir={dirFor('cover')} onSort={() => toggleSort('cover')}>
+                  Cover
+                </TH>
+                {showReorderCols && (
+                  <TH align="right" sortable sortDir={dirFor('order')} onSort={() => toggleSort('order')}>
+                    Order
+                  </TH>
+                )}
+                {showReorderCols && <TH>By</TH>}
+                {showCashCol && (
+                  <TH align="right" sortable sortDir={dirFor('cash')} onSort={() => toggleSort('cash')}>
+                    Cash tied up
+                  </TH>
+                )}
               </THead>
               <TBody>
-                {visible.map((rec) => {
+                {rows.map((rec) => {
                   const present = recommendationPresentation(rec.type)
                   const coverDanger =
                     rec.days_of_stock_left !== null && rec.days_of_stock_left < rec.lead_time_days
+                  const sourceLabel =
+                    rec.forecast_source === 'model'
+                      ? `Forecast model: ${rec.model_used ?? 'model'}`
+                      : `${summary.velocity_window_days}-day average (no fresh forecast)`
                   return (
                     <tr
                       key={rec.product_id}
+                      onClick={() => navigate(`/products/${rec.product_id}`)}
                       className={cn(
-                        'border-l-2 align-top transition-colors hover:bg-slate-50',
+                        'cursor-pointer border-l-2 align-top transition-colors hover:bg-slate-50',
                         rowTint[rec.type],
                       )}
                     >
-                      <TD>
-                        <Badge tone={present.tone}>{present.label}</Badge>
-                        <p className="mt-1 text-[10px] text-slate-400">
-                          {rec.forecast_source === 'model' ? rec.model_used ?? 'model' : 'window-avg'}
-                        </p>
-                      </TD>
+                      {showVerdict && (
+                        <TD>
+                          <Badge tone={present.tone}>{present.label}</Badge>
+                        </TD>
+                      )}
                       <TD>
                         <Link
                           to={`/products/${rec.product_id}`}
@@ -298,9 +470,18 @@ export function RecommendationsPage() {
                         </Link>
                         <div className="font-mono text-xs text-slate-400">
                           {rec.sku}
+                          {rec.category_name && ` · ${rec.category_name}`}
                           {!rec.is_active && ' · inactive'}
                         </div>
-                        <Tooltip content={rec.reasoning} className="mt-1">
+                        <Tooltip
+                          content={
+                            <>
+                              {rec.reasoning}
+                              <span className="mt-1 block text-slate-400">{sourceLabel}</span>
+                            </>
+                          }
+                          className="mt-1"
+                        >
                           <span className="line-clamp-1 max-w-xs text-xs text-slate-400">
                             {rec.reasoning}
                           </span>
@@ -309,13 +490,15 @@ export function RecommendationsPage() {
                       <TD>
                         <TrendChip pct={rec.demand_trend_pct} />
                       </TD>
-                      <TD>
-                        {rec.stockout_risk ? (
-                          <RiskBadge risk={rec.stockout_risk} />
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </TD>
+                      {showReorderCols && (
+                        <TD>
+                          {rec.stockout_risk ? (
+                            <RiskBadge risk={rec.stockout_risk} />
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </TD>
+                      )}
                       <TD numeric className="text-slate-600">
                         {formatNumber(rec.current_stock)}
                       </TD>
@@ -325,32 +508,38 @@ export function RecommendationsPage() {
                       <TD numeric className={coverDanger ? 'text-danger-600' : 'text-slate-600'}>
                         {coverLabel(rec)}
                       </TD>
-                      <TD numeric className="text-slate-600">
-                        {rec.needs_reorder ? formatNumber(rec.suggested_reorder_qty) : '—'}
-                      </TD>
-                      <TD>
-                        {rec.needs_reorder ? (
-                          <span
-                            className={cn(
-                              rec.is_urgent ? 'font-medium text-danger-600' : 'text-slate-600',
-                            )}
-                          >
-                            {reorderByLabel(rec)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </TD>
-                      <TD numeric className="text-slate-600">
-                        {rec.cash_tied_up > 0 ? formatCurrency(rec.cash_tied_up) : '—'}
-                      </TD>
+                      {showReorderCols && (
+                        <TD numeric className="text-slate-600">
+                          {rec.needs_reorder ? formatNumber(rec.suggested_reorder_qty) : '—'}
+                        </TD>
+                      )}
+                      {showReorderCols && (
+                        <TD>
+                          {rec.needs_reorder ? (
+                            <span
+                              className={cn(
+                                rec.is_urgent ? 'font-medium text-danger-600' : 'text-slate-600',
+                              )}
+                            >
+                              {reorderByLabel(rec)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </TD>
+                      )}
+                      {showCashCol && (
+                        <TD numeric className="text-slate-600">
+                          {rec.cash_tied_up > 0 ? formatCurrency(rec.cash_tied_up) : '—'}
+                        </TD>
+                      )}
                     </tr>
                   )
                 })}
               </TBody>
             </Table>
-          </Card>
-        )}
+          )}
+        </Card>
       </div>
     </div>
   )

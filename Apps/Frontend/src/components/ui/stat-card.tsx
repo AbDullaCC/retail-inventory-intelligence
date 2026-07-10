@@ -47,6 +47,14 @@ const statTones = {
   danger: 'text-danger-600',
 }
 
+const activeRings = {
+  default: 'border-slate-400 ring-1 ring-slate-400',
+  brand: 'border-brand-500 ring-1 ring-brand-500',
+  success: 'border-success-500 ring-1 ring-success-500',
+  warning: 'border-warning-500 ring-1 ring-warning-500',
+  danger: 'border-danger-500 ring-1 ring-danger-500',
+}
+
 interface StatCardProps {
   label: string
   value: string
@@ -57,13 +65,25 @@ interface StatCardProps {
   deltaLabel?: string
   sparkline?: number[]
   hint?: string
+  /** Renders the card as a button (e.g. a KPI that doubles as a filter). */
+  onClick?: () => void
+  /** Highlights the card with a tone-coloured ring while its filter is applied. */
+  active?: boolean
 }
 
-export function StatCard({ label, value, icon, tone = 'default', delta, deltaLabel, sparkline, hint }: StatCardProps) {
+export function StatCard({ label, value, icon, tone = 'default', delta, deltaLabel, sparkline, hint, onClick, active }: StatCardProps) {
   const showDelta = delta !== undefined && delta !== null && Number.isFinite(delta)
+  const Wrapper = onClick ? 'button' : 'div'
 
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-white p-5 shadow-card">
+    <Wrapper
+      {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': active } : {})}
+      className={cn(
+        'rounded-xl border border-slate-200/70 bg-white p-5 text-left shadow-card',
+        onClick && 'cursor-pointer transition-shadow hover:shadow-pop',
+        active && activeRings[tone],
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
         {icon && <span className={cn('shrink-0', statTones[tone])}>{icon}</span>}
@@ -91,6 +111,6 @@ export function StatCard({ label, value, icon, tone = 'default', delta, deltaLab
         </div>
         {sparkline && sparkline.length > 1 && <Sparkline values={sparkline} />}
       </div>
-    </div>
+    </Wrapper>
   )
 }
