@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Plug, Tags } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Plug, Sparkles, Tags } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { Avatar, Drawer, Tooltip, cn } from './ui'
+import { Avatar, Drawer, Skeleton, Tooltip, cn } from './ui'
 import { LogoWordmark } from './Logo'
+
+// Lazy so catalog pages don't pay the chat bundle cost (same pattern as charts).
+const ChatPanel = lazy(() =>
+  import('./chat/ChatPanel').then((m) => ({ default: m.ChatPanel })),
+)
 
 interface NavItem {
   to: string
@@ -106,6 +111,7 @@ function UserCard() {
 
 export function Layout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
 
   return (
     <div className="flex min-h-full">
@@ -148,6 +154,34 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* AI assistant: floating button → right-side drawer */}
+      <button
+        type="button"
+        onClick={() => setAssistantOpen(true)}
+        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-pop transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+        aria-label="Open the AI assistant"
+      >
+        <Sparkles className="h-5 w-5" />
+      </button>
+
+      <Drawer
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        title="Assistant"
+        subtitle="Answers from your live inventory data"
+      >
+        <Suspense
+          fallback={
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-3/4" />
+              <Skeleton className="h-10 w-1/2" />
+            </div>
+          }
+        >
+          <ChatPanel />
+        </Suspense>
+      </Drawer>
     </div>
   )
 }

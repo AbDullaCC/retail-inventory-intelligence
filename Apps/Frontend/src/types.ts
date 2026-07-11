@@ -229,3 +229,33 @@ export interface DashboardSummary {
   low_stock_products: Product[]
   recent_movements: StockMovement[]
 }
+
+/** Citation record: one read tool the assistant consulted for its answer. */
+export interface ChatToolCall {
+  name: string
+  summary: string
+}
+
+export interface ChatMessage {
+  id: number
+  thread_id: number
+  role: 'user' | 'assistant'
+  content: string
+  tool_calls: ChatToolCall[] | null
+  created_at: string
+}
+
+export interface ChatThread {
+  id: number
+  title: string
+  message_count: number
+  last_message_at: string | null
+  created_at: string
+  /** Only present on the thread-detail endpoint. */
+  messages?: ChatMessage[]
+}
+
+export interface ChatAnswer {
+  thread: ChatThread
+  message: ChatMessage
+}

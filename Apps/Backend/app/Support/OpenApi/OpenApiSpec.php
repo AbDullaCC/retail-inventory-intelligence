@@ -36,6 +36,7 @@ final class OpenApiSpec
                 ['name' => 'Intelligence', 'description' => 'Reorder & overstock recommendations derived from sales history.'],
                 ['name' => 'Forecast', 'description' => 'Time-series demand forecasts (statsforecast sidecar) for charting.'],
                 ['name' => 'Shopify', 'description' => 'Store connector: read-only import of products, orders and inventory.'],
+                ['name' => 'Chat', 'description' => 'AI assistant: read-only Q&A over stock, forecasts and recommendations (Gemini function calling over the existing read services).'],
             ],
             'security' => [['bearerAuth' => []]],
             'paths' => self::paths(),
@@ -193,6 +194,39 @@ final class OpenApiSpec
                     'description' => 'Last 90 days of zero-filled daily sales plus the stored forecast horizon with p90 bands. '
                         .'`forecast` is empty (and the model fields null) when no fresh forecast exists — run `php artisan forecast:run`.',
                     'responses' => ['200' => self::dataResponse('ProductForecast'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
+                ],
+            ],
+
+            '/api/chat/threads' => [
+                'get' => [
+                    'tags' => ['Chat'],
+                    'summary' => 'The current user\'s conversations, newest activity first',
+                    'responses' => ['200' => self::listResponse('ChatThread'), '401' => self::ref('Unauthorized')],
+                ],
+            ],
+            '/api/chat/threads/{thread}' => [
+                'parameters' => [self::idParam('thread')],
+                'get' => [
+                    'tags' => ['Chat'],
+                    'summary' => 'One conversation with its full message history',
+                    'responses' => ['200' => self::dataResponse('ChatThreadDetail'), '401' => self::ref('Unauthorized'), '404' => self::ref('NotFound')],
+                ],
+            ],
+            '/api/chat/messages' => [
+                'post' => [
+                    'tags' => ['Chat'],
+                    'summary' => 'Ask the assistant (creates a thread when thread_id is omitted)',
+                    'description' => 'Runs the LLM tool loop (up to several Gemini round-trips) and returns the persisted reply. '
+                        .'Rate-limited per user per hour. 503 carries the provider\'s own error message when Gemini is unavailable or unconfigured.',
+                    'requestBody' => self::body('ChatSendInput'),
+                    'responses' => [
+                        '200' => self::dataResponse('ChatAnswer'),
+                        '401' => self::ref('Unauthorized'),
+                        '404' => self::ref('NotFound'),
+                        '422' => self::ref('ValidationError'),
+                        '429' => self::messageResponse(),
+                        '503' => self::messageResponse(),
+                    ],
                 ],
             ],
 
@@ -707,6 +741,51 @@ final class OpenApiSpec
                 ],
             ],
 
+            'ChatToolCall' => [
+                'type' => 'object',
+                'description' => 'Citation record: one read tool the assistant consulted for its answer.',
+                'properties' => [
+                    'name' => ['type' => 'string', 'example' => 'get_recommendations'],
+                    'summary' => ['type' => 'string', 'example' => 'get_recommendations: 20 of 55 recommendations'],
+                ],
+            ],
+            'ChatMessage' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'thread_id' => ['type' => 'integer'],
+                    'role' => ['type' => 'string', 'enum' => ['user', 'assistant']],
+                    'content' => ['type' => 'string'],
+                    'tool_calls' => ['type' => 'array', 'items' => self::schemaRef('ChatToolCall'), 'nullable' => true],
+                    'created_at' => $dt,
+                ],
+            ],
+            'ChatThread' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'title' => ['type' => 'string', 'example' => 'What should I reorder this week?'],
+                    'message_count' => ['type' => 'integer'],
+                    'last_message_at' => $dt,
+                    'created_at' => $dt,
+                ],
+            ],
+            'ChatThreadDetail' => [
+                'allOf' => [
+                    self::schemaRef('ChatThread'),
+                    ['type' => 'object', 'properties' => [
+                        'messages' => ['type' => 'array', 'items' => self::schemaRef('ChatMessage')],
+                    ]],
+                ],
+            ],
+            'ChatAnswer' => [
+                'type' => 'object',
+                'properties' => [
+                    'thread' => self::schemaRef('ChatThread'),
+                    'message' => self::schemaRef('ChatMessage'),
+                ],
+            ],
+
             // Request bodies
             'RegisterInput' => [
                 'type' => 'object',
@@ -766,6 +845,14 @@ final class OpenApiSpec
                     'type' => ['type' => 'string', 'enum' => ['in', 'out', 'adjustment'], 'example' => 'in'],
                     'quantity' => ['type' => 'integer', 'minimum' => 0, 'example' => 25],
                     'reason' => ['type' => 'string', 'nullable' => true, 'example' => 'Restock'],
+                ],
+            ],
+            'ChatSendInput' => [
+                'type' => 'object',
+                'required' => ['message'],
+                'properties' => [
+                    'message' => ['type' => 'string', 'maxLength' => 2000, 'example' => 'What should I reorder this week?'],
+                    'thread_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Omit to start a new conversation.'],
                 ],
             ],
         ];

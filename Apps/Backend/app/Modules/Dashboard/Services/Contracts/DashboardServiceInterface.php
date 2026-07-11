@@ -17,4 +17,12 @@ interface DashboardServiceInterface
      * product (and empties the category breakdown).
      */
     public function trends(int $days, ?int $productId = null): DashboardTrendsDTO;
+
+    /**
+     * Best sellers: products ranked by units sold (`out` movements) over the
+     * trailing window. Revenue is estimated at the current product price.
+     *
+     * @return list<array{product_id: int, sku: string, name: string, units_sold: int, revenue: float}>
+     */
+    public function topProducts(int $days, int $limit): array;
 }

@@ -93,7 +93,11 @@
       "PowerShell(php -v)",
       "PowerShell(php --ri opcache 2>&1)",
       "PowerShell(Get-Process -Id 16152)",
-      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId = 16152\")"
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId = 16152\")",
+      "Bash(export PYTHONIOENCODING=utf-8)",
+      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/intelligence/recommendations)",
+      "Bash(python -c ' *)",
+      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/dashboard/summary)"
     ]
   }
 }

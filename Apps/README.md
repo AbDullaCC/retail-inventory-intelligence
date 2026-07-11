@@ -59,11 +59,15 @@ Backend/app/Modules/
 │   ├── Services/           # ForecastRunner (write side), ForecastReader (read side), DemandSeriesBuilder
 │   ├── Console/            # forecast:run (refresh forecasts) · forecast:evaluate (holdout backtest)
 │   └── DTOs/Mappers/Controllers/Routes/Database
-└── Intelligence/           # read-only analytics: reorder/overstock recommendations
-    ├── Services/           # ReorderCalculator (pure) + IntelligenceService (reads Product/Stock + Forecast reader)
-    ├── Support/            # ReorderConfig (named, tunable constants)
-    ├── Console/            # `inventory:insights` table command
-    └── DTOs/Mappers/Controllers/Routes
+├── Intelligence/           # read-only analytics: reorder/overstock recommendations
+│   ├── Services/           # ReorderCalculator (pure) + IntelligenceService (reads Product/Stock + Forecast reader)
+│   ├── Support/            # ReorderConfig (named, tunable constants)
+│   ├── Console/            # `inventory:insights` table command
+│   └── DTOs/Mappers/Controllers/Routes
+└── Chatbot/                # AI assistant: read-only Q&A over the other modules' read services
+    ├── Services/           # ChatService (threads + rate limit), ChatOrchestrator (tool loop), Llm/GeminiClient
+    ├── Services/Tools/     # 7 read-only tools wrapping the existing service interfaces
+    └── DTOs/Requests/Controllers/Routes/Database
 ```
 
 Modules are registered in `Backend/bootstrap/providers.php`. Each `*ServiceProvider`
@@ -162,7 +166,21 @@ The same flow is scriptable via `SHOPIFY_SHOP_DOMAIN`/`SHOPIFY_ADMIN_TOKEN` in
 A free [Shopify development store](https://shopify.dev/docs/api/development-stores)
 works for demos. The connector is read-only toward Shopify — it never writes back.
 
-### 6. Frontend (`Frontend/`)
+### 6. Optional: enable the AI assistant
+
+The floating chat button (bottom-right, on every screen) answers natural-language
+questions — *"What should I reorder this week?"*, *"How much cash is stuck in
+overstock?"* — by calling the app's own read services (strictly read-only, so it
+can never contradict the screens or change data).
+
+1. Create a **free** Gemini API key at <https://aistudio.google.com/apikey>.
+2. Set `GEMINI_API_KEY=<your key>` in `Backend/.env`.
+
+Without a key the rest of the app is unaffected; the assistant simply explains
+it isn't configured. Note the free tier's daily request cap, and that Google
+may train on free-tier traffic — fine for demo data, not for production use.
+
+### 7. Frontend (`Frontend/`)
 
 ```bash
 cd Frontend

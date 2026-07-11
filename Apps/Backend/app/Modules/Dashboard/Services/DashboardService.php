@@ -89,6 +89,31 @@ final class DashboardService implements DashboardServiceInterface
         );
     }
 
+    public function topProducts(int $days, int $limit): array
+    {
+        // Same calendar-window convention as trends(): today plus the
+        // previous $days-1 whole days.
+        $start = Carbon::now()->startOfDay()->subDays($days - 1);
+
+        return StockMovement::query()
+            ->join('products', 'products.id', '=', 'stock_movements.product_id')
+            ->where('stock_movements.type', StockMovementType::Out->value)
+            ->where('stock_movements.created_at', '>=', $start)
+            ->groupBy('products.id', 'products.sku', 'products.name', 'products.price')
+            ->selectRaw('products.id as product_id, products.sku, products.name, products.price, SUM(stock_movements.quantity) as units_sold')
+            ->orderByDesc('units_sold')
+            ->limit($limit)
+            ->get()
+            ->map(static fn ($row): array => [
+                'product_id' => (int) $row->product_id,
+                'sku' => (string) $row->sku,
+                'name' => (string) $row->name,
+                'units_sold' => (int) $row->units_sold,
+                'revenue' => round((float) $row->units_sold * (float) $row->price, 2),
+            ])
+            ->all();
+    }
+
     /**
      * @return list<array{category_id: int, category_name: string, stock_value: float, units: int}>
      */
