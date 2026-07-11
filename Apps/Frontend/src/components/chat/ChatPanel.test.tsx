@@ -8,12 +8,30 @@ import type { ChatAnswer } from '../../types'
 vi.mock('../../api/chat', () => ({
   chatApi: {
     sendMessage: vi.fn(),
+    getThreads: vi.fn(),
+    getThread: vi.fn(),
   },
 }))
 
 import { chatApi } from '../../api/chat'
+import type { ChatThread } from '../../types'
 
 const mockedSend = vi.mocked(chatApi.sendMessage)
+const mockedGetThreads = vi.mocked(chatApi.getThreads)
+const mockedGetThread = vi.mocked(chatApi.getThread)
+
+function thread(overrides: Partial<ChatThread> = {}): ChatThread {
+  return {
+    id: 1,
+    user_id: 7,
+    title: 'New chat',
+    message_count: 0,
+    last_message_at: null,
+    created_at: '2026-07-10T10:00:00Z',
+    messages: null,
+    ...overrides,
+  }
+}
 
 function answer(overrides: Partial<ChatAnswer> = {}): ChatAnswer {
   return {
@@ -41,9 +59,13 @@ function answer(overrides: Partial<ChatAnswer> = {}): ChatAnswer {
 describe('ChatPanel', () => {
   beforeEach(() => {
     mockedSend.mockReset()
+    mockedGetThreads.mockReset()
+    mockedGetThread.mockReset()
+    // The panel loads threads on mount; default to an empty list.
+    mockedGetThreads.mockResolvedValue([])
   })
 
-  it('renders the empty state with suggested prompts', () => {
+  it('renders the empty state with suggested prompts', async () => {
     render(<ChatPanel />)
     expect(screen.getByText('Ask Shelfwise anything')).toBeInTheDocument()
     expect(screen.getByText('What should I reorder this week?')).toBeInTheDocument()
@@ -104,5 +126,42 @@ describe('ChatPanel', () => {
     fireEvent.keyDown(screen.getByLabelText('Message'), { key: 'Enter' })
 
     await waitFor(() => expect(screen.getByText(/high demand/)).toBeInTheDocument())
+  })
+
+  it('lists past threads and loads messages when one is opened', async () => {
+    const pastThreads = [
+      thread({ id: 11, title: 'Reorder question', message_count: 4, last_message_at: '2026-07-09T12:00:00Z' }),
+      thread({ id: 12, title: 'Dead stock', message_count: 2, last_message_at: '2026-07-08T09:00:00Z' }),
+    ]
+    mockedGetThreads.mockResolvedValueOnce(pastThreads)
+
+    const fetched: ChatThread = {
+      id: 11,
+      user_id: 7,
+      title: 'Reorder question',
+      message_count: 4,
+      last_message_at: '2026-07-09T12:00:00Z',
+      created_at: '2026-07-09T11:00:00Z',
+      messages: [
+        { id: 1, thread_id: 11, role: 'user', content: 'old question', tool_calls: null, created_at: '2026-07-09T11:00:00Z' },
+        { id: 2, thread_id: 11, role: 'assistant', content: 'old answer', tool_calls: null, created_at: '2026-07-09T11:01:00Z' },
+      ],
+    }
+    mockedGetThread.mockResolvedValueOnce(fetched)
+
+    render(<ChatPanel />)
+
+    // Open the history section and see both threads.
+    await waitFor(() => expect(mockedGetThreads).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: /History/i }))
+
+    await waitFor(() => expect(screen.getByText('Reorder question')).toBeInTheDocument())
+    expect(screen.getByText('Dead stock')).toBeInTheDocument()
+
+    // Clicking a thread fetches and shows its persisted messages.
+    fireEvent.click(screen.getByText('Reorder question'))
+    await waitFor(() => expect(mockedGetThread).toHaveBeenCalledWith(11))
+    await waitFor(() => expect(screen.getByText('old answer')).toBeInTheDocument())
+    expect(screen.queryByText('Ask Shelfwise anything')).not.toBeInTheDocument()
   })
 })
