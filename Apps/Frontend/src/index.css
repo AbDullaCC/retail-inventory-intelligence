@@ -78,3 +78,102 @@ body {
 ::selection {
   background: var(--color-brand-100);
 }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes counter-orbit {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes cosmic-glow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgb(34 211 238 / 0.6)) drop-shadow(0 0 16px rgb(192 132 252 / 0.4)); }
+  50% { filter: drop-shadow(0 0 16px rgb(34 211 238 / 0.8)) drop-shadow(0 0 28px rgb(192 132 252 / 0.6)); }
+}
+
+@keyframes nebula-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.98); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 200%;
+  animation: shimmer 6s ease infinite;
+}
+
+.animate-message-in {
+  animation: message-in 0.25s ease-out both;
+}
+
+.animate-orbit {
+  animation: orbit 12s linear infinite;
+}
+
+.animate-counter-orbit {
+  animation: counter-orbit 8s linear infinite;
+}
+
+.animate-cosmic-glow {
+  animation: cosmic-glow 3s ease-in-out infinite;
+}
+
+.animate-nebula-drift {
+  animation: nebula-drift 20s ease-in-out infinite;
+}
+
+.animate-ring-pulse {
+  animation: ring-pulse 2s ease-in-out infinite;
+}
+
+/* Cosmic scrollbar — used inside the dark assistant drawer. */
+.scrollbar-cosmic {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(34 211 238 / 0.35) transparent;
+}
+
+.scrollbar-cosmic::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-cosmic::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-cosmic::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(34 211 238 / 0.35);
+}
+
+.scrollbar-cosmic::-webkit-scrollbar-thumb:hover {
+  background: rgb(34 211 238 / 0.65);
+}

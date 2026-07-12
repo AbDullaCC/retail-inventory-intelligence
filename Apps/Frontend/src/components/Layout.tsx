@@ -155,27 +155,37 @@ export function Layout() {
         </main>
       </div>
 
-      {/* AI assistant: floating button → right-side drawer */}
-      <button
-        type="button"
-        onClick={() => setAssistantOpen(true)}
-        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-pop transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-        aria-label="Open the AI assistant"
-      >
-        <Sparkles className="h-5 w-5" />
-      </button>
+      {/* AI assistant: cosmic floating button → right-side drawer */}
+      <div className="fixed bottom-6 right-6 z-40 inline-block transition-all duration-300 hover:scale-110 active:scale-95">
+        <button
+          type="button"
+          onClick={() => setAssistantOpen(true)}
+          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-brand-500 to-fuchsia-500 text-white shadow-[0_0_40px_-6px_rgb(34_211_238_/0.5),0_0_60px_-12px_rgb(192_132_252_/0.35)] ring-[3px] ring-white/90 transition-all duration-300 hover:shadow-[0_0_60px_-6px_rgb(34_211_238_/0.7),0_0_80px_-12px_rgb(192_132_252_/0.5)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/50 animate-float group"
+          aria-label="Open the AI assistant"
+        >
+          <span className="pointer-events-none absolute inset-[-28px] rounded-full border border-cyan-300/40 opacity-60 animate-orbit" style={{ clipPath: 'ellipse(48% 22% at 50% 50%)' }} />
+          <span className="pointer-events-none absolute inset-[-36px] rounded-full border border-fuchsia-300/30 opacity-50 animate-counter-orbit" style={{ clipPath: 'ellipse(46% 18% at 50% 50%)' }} />
+          <Sparkles className="relative h-6 w-6 animate-pulse" />
+        </button>
+      </div>
 
       <Drawer
         open={assistantOpen}
         onClose={() => setAssistantOpen(false)}
         title="Assistant"
         subtitle="Answers from your live inventory data"
+        panelClassName="border-l border-cyan-500/30 bg-[linear-gradient(135deg,#0f172a_0%,#0b2c2a_40%,#1e1b4b_100%)]"
+        headerClassName="border-b border-white/10 bg-gradient-to-r from-cyan-500/20 via-brand-500/20 to-fuchsia-500/20"
+        contentClassName="scrollbar-cosmic"
+        titleClassName="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300"
+        subtitleClassName="text-cyan-100/70"
+        closeButtonClassName="text-cyan-200 hover:bg-white/10 hover:text-white"
       >
         <Suspense
           fallback={
-            <div className="space-y-3">
-              <Skeleton className="h-10 w-3/4" />
-              <Skeleton className="h-10 w-1/2" />
+            <div className="space-y-3 rounded-xl">
+              <Skeleton className="h-10 w-3/4 rounded-xl bg-white/10" />
+              <Skeleton className="h-10 w-1/2 rounded-xl bg-white/10" />
             </div>
           }
         >
