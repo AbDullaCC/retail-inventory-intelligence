@@ -42,6 +42,16 @@ uvicorn app.main:app --host 127.0.0.1 --port 8100
 Python 3.11/3.12 (statsforecast depends on numba). The first request after
 boot is slower — numba JIT warm-up. Tests: `pytest`.
 
+## Sizing
+
+CPU-only (statistical models — no GPU, ever), stateless, and batch-shaped:
+~250 products × 2 years of daily history fit in **under a minute on 6 laptop
+cores**; the Python environment needs ~600 MB disk and a few hundred MB RAM.
+Any small VPS (2 vCPU / 4 GB) is enough for hundreds of SKUs, and the service
+scales horizontally because it holds no state. Full sizing guidance —
+including the multi-tenant outlook — lives in `Apps/README.md` →
+“Deployment & server sizing”.
+
 ## Security
 
 Bind to `127.0.0.1` only — the service has no auth. If it is ever deployed

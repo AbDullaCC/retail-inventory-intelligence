@@ -317,6 +317,64 @@ API contract (shapes, intervals, non-negativity).
 
 ---
 
+## Deployment & server sizing
+
+### What the workload actually is
+
+The forecasting engine uses **statistical models** (AutoETS, MSTL, Croston, TSB via
+Nixtla `statsforecast`), not deep learning — it is CPU-only and **never needs a GPU**.
+The models are fitted as a **nightly batch job**, not per request: users and the AI
+assistant read stored forecasts from MySQL, so forecasting cost is invisible at
+request time. The sidecar is **stateless** (series in → forecasts out), which makes
+horizontal scaling trivial, and requests are chunked at 50 products, so catalogue
+size only ever means *more chunks*, never bigger requests.
+
+Reference measurements (development laptop, Intel i7-10750H — 6 cores — 16 GB RAM):
+
+- Full refresh of **~250 products with 2 years of daily history each: under 1 minute**,
+  including the heaviest tier (MSTL with weekly + annual seasonality on 730-day series).
+- Input data is tiny (250 × 730 daily values ≈ 1.5 MB); resident memory is dominated
+  by the Python runtime itself (typically a few hundred MB).
+- Disk: ~600 MB for the Python environment; the sidecar stores nothing.
+- Cold-start note: the first request after boot is slower (numba JIT compiles once,
+  then caches).
+
+### Single-tenant sizing
+
+| Scenario | Spec | Notes |
+|---|---|---|
+| Demo / small retailer (≤ ~500 SKUs) | 2 vCPU, 4 GB RAM | Nightly refresh in ~1–2 min; sidecar can share the app server |
+| Mid-size (thousands of SKUs) | 4–8 vCPU, 8 GB RAM | Work scales linearly with SKU count and parallelises across cores |
+
+The API (Laravel + MySQL) has equally ordinary needs at this scale; in production use
+a real web server (nginx/Apache + PHP-FPM with OPcache — not `artisan serve`) and put
+cache/queues on Redis.
+
+### Multi-tenant outlook
+
+The codebase is currently **single-tenant** (one store per install — there is no
+`tenant_id` scoping on catalogue or ledger tables, and chatbot tools read global
+data). Expanding to multi-tenant is primarily a *data-model* change (tenant scoping
+or database-per-tenant); the compute story stays simple:
+
+- **Forecasting scales linearly with total SKUs across all tenants** and is
+  embarrassingly parallel. Ballpark from the measured baseline (~250 series/min on
+  6 laptop cores): 100 tenants × 500 SKUs = 50k series ≈ 3–4 CPU-hours — one 8-vCPU
+  worker overnight, or a handful of stateless sidecar replicas behind a queue for a
+  shorter window. Stagger per-tenant refresh times rather than sizing for a spike.
+- **MySQL becomes the real constraint before compute does**: the movements ledger
+  dominates row counts (a mid-size tenant ≈ 100k rows per 2 years). Size the database
+  for the ledger (16–32 GB RAM, fast storage, read replica for analytics) and
+  partition or shard by tenant when row counts demand it.
+- **The API layer scales horizontally** (stateless bearer-token auth, no server
+  sessions) behind a load balancer.
+- **The AI assistant** adds negligible CPU (it is LLM-API-bound) but multi-tenancy
+  requires moving off the Gemini free tier: paid tier (or a self-hosted model behind
+  the existing `LlmClientInterface`) for data-privacy and per-day quota reasons, plus
+  per-tenant rate limits.
+
+---
+
 ## Project structure
 
 ```

@@ -14,6 +14,13 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "Apps/Frontend",
       "port": 5173
+    },
+    {
+      "name": "sidecar",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8100"],
+      "cwd": "Apps/Forecast",
+      "port": 8100
     }
   ]
 }
