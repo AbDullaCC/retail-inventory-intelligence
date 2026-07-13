@@ -29,6 +29,9 @@ php artisan shopify:sync                            # pull products/orders/inven
 php artisan forecast:run                            # refresh per-product forecasts (sidecar must be running)
 php artisan forecast:evaluate                       # holdout backtest: model WAPE vs legacy 14d-average
 php artisan inventory:insights                      # per-product verdict table (model column included)
+php artisan chatbot:evaluate                        # golden-question scorecard for the AI assistant: asks the
+                                                    #   live model, checks answers vs DB-computed ground truth
+                                                    #   (needs GEMINI_API_KEY + MySQL; --list to preview, --only=key)
 php artisan test                                    # full suite (PHPUnit, in-memory SQLite)
 php artisan test --filter=test_stock_in_increases   # single test by method name
 php artisan test tests/Feature/Stock/StockServiceTest.php  # single file

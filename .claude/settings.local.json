@@ -97,7 +97,12 @@
       "Bash(export PYTHONIOENCODING=utf-8)",
       "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/intelligence/recommendations)",
       "Bash(python -c ' *)",
-      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/dashboard/summary)"
+      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Accept: application/json' http://127.0.0.1:8000/api/dashboard/summary)",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(grep -n 'commands\\\\|Console' D:/GitHub/retail-inventory-intelligence/Apps/Backend/app/Modules/Forecast/Providers/ForecastServiceProvider.php)",
+      "Bash(echo ---)",
+      "Bash(ls D:/GitHub/retail-inventory-intelligence/Apps/Backend/app/Modules/Forecast/Console/)"
     ]
   }
 }

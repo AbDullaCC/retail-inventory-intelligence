@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Chatbot\Providers;
 
+use App\Modules\Chatbot\Console\ChatbotEvaluateCommand;
 use App\Modules\Chatbot\Services\ChatOrchestrator;
 use App\Modules\Chatbot\Services\ChatService;
 use App\Modules\Chatbot\Services\Contracts\ChatServiceInterface;
@@ -75,5 +76,9 @@ final class ChatbotServiceProvider extends ModuleServiceProvider
     {
         $this->loadApiRoutes(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([ChatbotEvaluateCommand::class]);
+        }
     }
 }

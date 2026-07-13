@@ -315,6 +315,14 @@ recommendation presentation map.
 **Sidecar** — pytest: `cd Forecast && pytest` covers demand-pattern classification and the
 API contract (shapes, intervals, non-negativity).
 
+**AI assistant (live evaluation)** — `php artisan chatbot:evaluate` is a golden-question
+scorecard: it asks the real assistant ~12 typical questions (inventory value, urgent
+reorders, top sellers, forecasts, a hallucination trap, an action-request refusal) and
+checks every answer against ground truth computed from the database at that moment.
+Requires `GEMINI_API_KEY` and the database; each run spends a few dozen requests of the
+free-tier quota. `--list` previews the questions; `--only=key` runs a subset. Run it
+before every demo.
+
 ---
 
 ## Deployment & server sizing
