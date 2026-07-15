@@ -288,7 +288,7 @@ export function ProductsPage() {
           ))}
         </Select>
         <Checkbox
-          label="Low stock only"
+          label="Below min level"
           checked={filters.low_stock === true}
           onChange={(e) => setFilters((f) => ({ ...f, low_stock: e.target.checked, page: 1 }))}
         />
@@ -498,7 +498,11 @@ export function ProductsPage() {
 
           <SectionLabel>Inventory</SectionLabel>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Reorder level" htmlFor="p-reorder" hint="Low-stock threshold.">
+            <Field
+              label="Min stock level"
+              htmlFor="p-reorder"
+              hint="Optional manual floor — reorder alerts come from the demand model."
+            >
               <Input
                 id="p-reorder"
                 type="number"

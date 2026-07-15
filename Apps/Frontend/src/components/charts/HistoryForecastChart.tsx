@@ -86,7 +86,16 @@ export default function HistoryForecastChart({
           formatter={(value, name) => [formatNumber(Number(value)), labels[String(name)] ?? name]}
         />
         <Area dataKey="band_lo" stackId="band" stroke="none" fill="none" legendType="none" tooltipType="none" />
-        <Area dataKey="band_delta" stackId="band" stroke="none" fill={chartColors.infoSoft} fillOpacity={0.75} />
+        {/* Zero-opacity stroke draws nothing — it only gives the tooltip row a
+            readable text color instead of the pale band fill. */}
+        <Area
+          dataKey="band_delta"
+          stackId="band"
+          stroke={chartColors.infoDark}
+          strokeOpacity={0}
+          fill={chartColors.infoSoft}
+          fillOpacity={0.75}
+        />
         <Area dataKey="actual" stroke={chartColors.brand} strokeWidth={2} fill="url(#actualFill)" dot={false} />
         <Line
           dataKey="forecast"

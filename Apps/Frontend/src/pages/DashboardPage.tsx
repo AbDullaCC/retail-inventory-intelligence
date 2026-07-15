@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { AlertTriangle, PackageX, TrendingUp, Wallet } from 'lucide-react'
 import { dashboardApi } from '../api/dashboard'
@@ -18,7 +18,6 @@ import {
   TableSkeleton,
   cn,
 } from '../components/ui'
-import { StockStatusBadge } from '../components/StockStatusBadge'
 import { formatCurrency, formatDateTime, formatNumber } from '../lib/format'
 import { computeDelta, toSparkline, totalUnitsOut } from '../lib/trends'
 import { usePageTitle } from '../lib/usePageTitle'
@@ -26,6 +25,7 @@ import type {
   DashboardSummary,
   DashboardTrends,
   ForecastSummary,
+  Recommendation,
   StockMovementType,
 } from '../types'
 
@@ -44,6 +44,11 @@ function movementTone(type: StockMovementType): 'green' | 'red' | 'indigo' {
   if (type === 'in') return 'green'
   if (type === 'out') return 'red'
   return 'indigo'
+}
+
+function coverLabel(rec: Recommendation): string {
+  if (rec.days_of_stock_left === null) return 'no sales data'
+  return `${Math.round(rec.days_of_stock_left)}d cover`
 }
 
 function DashboardSkeleton() {
@@ -81,6 +86,7 @@ function DashboardSkeleton() {
 export function DashboardPage() {
   usePageTitle('Dashboard')
 
+  const navigate = useNavigate()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [trends, setTrends] = useState<DashboardTrends | null>(null)
   const [forecast, setForecast] = useState<ForecastSummary | null>(null)
@@ -180,11 +186,16 @@ export function DashboardPage() {
               />
             )}
             <StatCard
-              label="Low stock"
-              value={formatNumber(summary.low_stock_count)}
+              label="Needs reorder"
+              value={formatNumber(summary.reorder_count)}
               tone="warning"
               icon={<AlertTriangle className="h-4 w-4" />}
-              hint="at or below reorder level"
+              hint={
+                summary.urgent_count > 0
+                  ? `${formatNumber(summary.urgent_count)} urgent — order today`
+                  : 'from demand forecasts'
+              }
+              onClick={() => navigate('/recommendations')}
             />
             <StatCard
               label="Out of stock"
@@ -229,42 +240,47 @@ export function DashboardPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card
-              title="Low stock alerts"
+              title="Reorder alerts"
+              subtitle="From the demand model — most urgent first"
               actions={
                 <Link
-                  to="/products"
+                  to="/recommendations"
                   className="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700"
                 >
                   View all
                 </Link>
               }
             >
-              {summary.low_stock_products.length === 0 ? (
-                <EmptyState title="All good!" message="No products need restocking right now." />
+              {summary.reorder_products.length === 0 ? (
+                <EmptyState title="All good!" message="Nothing needs reordering right now." />
               ) : (
                 <ul className="divide-y divide-slate-100">
-                  {summary.low_stock_products.map((product) => (
-                    <li key={product.id} className="px-5 py-3">
+                  {summary.reorder_products.map((rec) => (
+                    <li key={rec.product_id} className="px-5 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-baseline gap-2">
                           <Link
-                            to={`/products/${product.id}`}
+                            to={`/products/${rec.product_id}`}
                             className="truncate text-sm font-medium text-slate-800 transition-colors hover:text-brand-600"
                           >
-                            {product.name}
+                            {rec.name}
                           </Link>
-                          <span className="shrink-0 font-mono text-xs text-slate-400">{product.sku}</span>
+                          <span className="shrink-0 font-mono text-xs text-slate-400">{rec.sku}</span>
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
                           <span className="text-sm text-slate-600 tabular-nums">
-                            {formatNumber(product.quantity)} / {formatNumber(product.reorder_level)} reorder
+                            {formatNumber(rec.current_stock)} left · {coverLabel(rec)} · order{' '}
+                            {formatNumber(rec.suggested_reorder_qty)}
                           </span>
-                          <StockStatusBadge product={product} />
+                          <Badge tone={rec.is_urgent ? 'red' : 'amber'} dot>
+                            {rec.is_urgent ? 'Order today' : 'Reorder'}
+                          </Badge>
                         </div>
                       </div>
+                      {/* Runway vs supplier lead time: an empty bar means it cannot be restocked in time. */}
                       <CapacityBar
-                        value={product.quantity}
-                        max={product.reorder_level}
+                        value={Math.max(0, Math.round(rec.days_of_stock_left ?? 0))}
+                        max={rec.lead_time_days}
                         className="mt-2"
                       />
                     </li>

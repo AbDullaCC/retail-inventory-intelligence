@@ -30,9 +30,9 @@ describe('StockStatusBadge', () => {
     expect(screen.getByText('Out of stock')).toBeInTheDocument()
   })
 
-  it('shows "Low stock" when flagged and quantity > 0', () => {
+  it('shows "Below min" when under the manual minimum and quantity > 0', () => {
     render(<StockStatusBadge product={makeProduct({ quantity: 5, is_low_stock: true })} />)
-    expect(screen.getByText('Low stock')).toBeInTheDocument()
+    expect(screen.getByText('Below min')).toBeInTheDocument()
   })
 
   it('shows "In stock" otherwise', () => {

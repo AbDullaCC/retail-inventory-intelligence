@@ -222,11 +222,15 @@ export interface DashboardSummary {
   total_products: number
   active_products: number
   total_categories: number
-  low_stock_count: number
+  /** Products the intelligence engine says to reorder (not the manual reorder_level). */
+  reorder_count: number
+  /** Subset of reorder_count to order today. */
+  urgent_count: number
   out_of_stock_count: number
   total_stock_units: number
   total_stock_value: number
-  low_stock_products: Product[]
+  /** Top 5 reorder recommendations, most urgent first. */
+  reorder_products: Recommendation[]
   recent_movements: StockMovement[]
 }
 

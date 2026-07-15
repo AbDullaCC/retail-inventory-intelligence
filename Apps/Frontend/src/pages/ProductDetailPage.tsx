@@ -452,7 +452,7 @@ export function ProductDetailPage() {
                 )}
                 <div className="divide-y divide-slate-100">
                   <DetailRow label="On hand" value={`${formatNumber(product.quantity)} units`} />
-                  <DetailRow label="Reorder level" value={formatNumber(product.reorder_level)} />
+                  <DetailRow label="Min level (manual)" value={formatNumber(product.reorder_level)} />
                   <DetailRow label="Price" value={formatCurrency(product.price)} />
                   <DetailRow label="Cost" value={formatCurrency(product.cost)} />
                   <DetailRow label="Stock value" value={formatCurrency(product.stock_value)} />

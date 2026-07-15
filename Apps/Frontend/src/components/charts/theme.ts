@@ -6,6 +6,7 @@ export const chartColors = {
   brand: '#1d8f8a',
   brandDark: '#0f7470',
   info: '#0284c7',
+  infoDark: '#0369a1',
   infoSoft: '#e0f2fe',
   warning: '#d97706',
   axis: '#94a3b8',

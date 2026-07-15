@@ -81,9 +81,19 @@ export default function MovementsTrendChart({ series, projection = [], height = 
           labelFormatter={(label) => formatShortDate(String(label))}
           formatter={(value, name) => [formatNumber(Number(value)), seriesLabels[String(name)] ?? name]}
         />
-        {/* p90 band: invisible baseline + shaded span stacked on top */}
+        {/* p90 band: invisible baseline + shaded span stacked on top.
+            The zero-opacity stroke draws nothing — it only sets the tooltip
+            text color (Recharts uses stroke over fill), because the pale
+            band fill is unreadable on the white tooltip. */}
         <Area dataKey="band_lo" stackId="band" stroke="none" fill="none" legendType="none" tooltipType="none" />
-        <Area dataKey="band_delta" stackId="band" stroke="none" fill={chartColors.infoSoft} fillOpacity={0.7} />
+        <Area
+          dataKey="band_delta"
+          stackId="band"
+          stroke={chartColors.infoDark}
+          strokeOpacity={0}
+          fill={chartColors.infoSoft}
+          fillOpacity={0.7}
+        />
         <Area
           dataKey="units_out"
           stroke={chartColors.brand}

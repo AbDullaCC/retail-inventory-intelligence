@@ -212,7 +212,7 @@ requires `Authorization: Bearer <token>`.
 | POST   | `/auth/register` · `/auth/login`           | → `{ token, user }`                  |
 | POST   | `/auth/logout`                             | Revoke current token                 |
 | GET    | `/auth/me`                                 | Current user                         |
-| GET    | `/dashboard/summary`                       | KPIs + low-stock + recent movements  |
+| GET    | `/dashboard/summary`                       | KPIs + reorder alerts (intelligence verdicts) + recent movements |
 | GET    | `/dashboard/trends?days&product_id`        | Zero-filled daily in/out series + category values (charts) |
 | GET    | `/categories` (+ POST/GET/PUT/DELETE `{id}`)| Category CRUD (409 if it still has products) |
 | GET    | `/products` (+ POST/GET/PUT/DELETE `{id}`) | Product CRUD — `search, category_id, low_stock, is_active, sort_by, sort_dir, per_page, page` |

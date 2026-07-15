@@ -8,7 +8,8 @@ use App\Modules\Category\Models\Category;
 use App\Modules\Dashboard\DTOs\DashboardSummaryDTO;
 use App\Modules\Dashboard\DTOs\DashboardTrendsDTO;
 use App\Modules\Dashboard\Services\Contracts\DashboardServiceInterface;
-use App\Modules\Product\Mappers\ProductMapper;
+use App\Modules\Intelligence\DTOs\RecommendationDTO;
+use App\Modules\Intelligence\Services\Contracts\IntelligenceServiceInterface;
 use App\Modules\Product\Models\Product;
 use App\Modules\Stock\Enums\StockMovementType;
 use App\Modules\Stock\Models\StockMovement;
@@ -17,35 +18,60 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Aggregates read-only KPIs across the Product, Category and Stock modules for
- * the dashboard landing screen.
+ * Aggregates read-only KPIs across the Product, Category, Stock and
+ * Intelligence modules for the dashboard landing screen.
+ *
+ * The restocking alert is intelligence-driven: it counts the products whose
+ * verdict is `reorder` (forecast- or velocity-based), NOT the manual
+ * `reorder_level` column — that field survives only as an optional per-product
+ * minimum (it defaults to 0 for Shopify-synced products, so an alert built on
+ * it would be dead for connected stores). Dashboard and Recommendations page
+ * therefore always agree on "what needs ordering".
  */
 final class DashboardService implements DashboardServiceInterface
 {
+    /**
+     * Rows per landing-screen panel. The reorder-alert and recent-activity
+     * cards sit side by side, so they share one length on purpose.
+     */
+    private const PANEL_ITEMS = 5;
+
     public function __construct(
-        private readonly ProductMapper $productMapper,
         private readonly StockServiceInterface $stockService,
+        private readonly IntelligenceServiceInterface $intelligence,
     ) {}
 
     public function summary(): DashboardSummaryDTO
     {
-        $lowStockProducts = Product::query()
-            ->with('category')
-            ->whereColumn('quantity', '<=', 'reorder_level')
-            ->orderBy('quantity')
-            ->limit(5)
-            ->get();
+        $intel = $this->intelligence->recommendations();
+
+        $reorder = array_values(array_filter(
+            $intel->recommendations,
+            static fn (RecommendationDTO $r): bool => $r->type === 'reorder',
+        ));
+
+        // Urgent first, then shortest cover — same ordering as the chatbot's
+        // get_recommendations tool, so every surface shows the same top items.
+        usort($reorder, static function (RecommendationDTO $a, RecommendationDTO $b): int {
+            $urgency = (int) $b->isUrgent <=> (int) $a->isUrgent;
+            if ($urgency !== 0) {
+                return $urgency;
+            }
+
+            return ($a->daysOfStockLeft ?? PHP_FLOAT_MAX) <=> ($b->daysOfStockLeft ?? PHP_FLOAT_MAX);
+        });
 
         return new DashboardSummaryDTO(
             totalProducts: Product::query()->count(),
             activeProducts: Product::query()->where('is_active', true)->count(),
             totalCategories: Category::query()->count(),
-            lowStockCount: Product::query()->whereColumn('quantity', '<=', 'reorder_level')->count(),
+            reorderCount: $intel->reorderCount,
+            urgentCount: count(array_filter($reorder, static fn (RecommendationDTO $r): bool => $r->isUrgent)),
             outOfStockCount: Product::query()->where('quantity', 0)->count(),
             totalStockUnits: (int) Product::query()->sum('quantity'),
             totalStockValue: round((float) Product::query()->sum(DB::raw('price * quantity')), 2),
-            lowStockProducts: $this->productMapper->toDTOCollection($lowStockProducts),
-            recentMovements: $this->stockService->recent(8),
+            reorderProducts: array_slice($reorder, 0, self::PANEL_ITEMS),
+            recentMovements: $this->stockService->recent(self::PANEL_ITEMS),
         );
     }
 
