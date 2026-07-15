@@ -1,15 +1,19 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ClipboardList,
+  Download,
   Info,
+  RefreshCw,
   Search,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
+import { forecastApi } from '../api/forecast'
 import { intelligenceApi } from '../api/intelligence'
 import { apiErrorMessage } from '../lib/api'
 import { formatCurrency, formatDelta, formatNumber, formatShortDate } from '../lib/format'
@@ -22,12 +26,14 @@ import {
 import { usePageTitle } from '../lib/usePageTitle'
 import {
   Badge,
+  Button,
   Card,
   ChartSkeleton,
   cn,
   EmptyState,
   Input,
   PageHeader,
+  Pagination,
   SegmentedControl,
   StatCard,
   StatCardSkeleton,
@@ -95,6 +101,8 @@ function sortValue(rec: Recommendation, key: SortKey): number | null {
 function TrendChip({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="text-slate-400">—</span>
   const up = pct >= 0
+  // Extreme swings (tiny baselines) read as noise — cap the display at ±500%.
+  const label = Math.abs(pct) > 500 ? `${up ? '+' : '−'}500%+` : formatDelta(pct)
   return (
     <span
       className={cn(
@@ -103,9 +111,14 @@ function TrendChip({ pct }: { pct: number | null }) {
       )}
     >
       {up ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-      {formatDelta(pct)}
+      {label}
     </span>
   )
+}
+
+function csvEscape(value: string | number | null | undefined): string {
+  const s = value === null || value === undefined ? '' : String(value)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 function RiskBadge({ risk }: { risk: StockoutRisk }) {
@@ -118,6 +131,7 @@ function coverLabel(rec: Recommendation): string {
 }
 
 const URGENT_PREVIEW = 5
+const PAGE_SIZE = 25
 
 export function RecommendationsPage() {
   usePageTitle('Recommendations')
@@ -125,17 +139,43 @@ export function RecommendationsPage() {
 
   const [summary, setSummary] = useState<RecommendationsSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [forecasting, setForecasting] = useState(false)
   const [filter, setFilter] = useState<Filter>('reorder')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null)
+  const [page, setPage] = useState(1)
+
+  // Any change to what the table shows starts back at page 1.
+  useEffect(() => {
+    setPage(1)
+  }, [filter, query, sort])
+
+  const load = useCallback(
+    () =>
+      intelligenceApi
+        .recommendations()
+        .then(setSummary)
+        .catch((error) => toast.error(apiErrorMessage(error)))
+        .finally(() => setLoading(false)),
+    [],
+  )
 
   useEffect(() => {
-    intelligenceApi
-      .recommendations()
-      .then(setSummary)
-      .catch((error) => toast.error(apiErrorMessage(error)))
-      .finally(() => setLoading(false))
-  }, [])
+    void load()
+  }, [load])
+
+  const onRefreshForecasts = async () => {
+    setForecasting(true)
+    try {
+      const result = await forecastApi.run()
+      toast.success(`Forecasted ${formatNumber(result.forecasted)} products.`)
+      await load()
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Forecast refresh failed — is the forecast service running?'))
+    } finally {
+      setForecasting(false)
+    }
+  }
 
   /** Clicking a KPI card applies its filter; clicking it again shows everything. */
   const toggleFilter = (next: RecommendationType) => {
@@ -182,10 +222,72 @@ export function RecommendationsPage() {
     return sorted
   }, [summary, filter, query, sort])
 
+  // Client-side pages: the API returns the full analysis in one payload (the
+  // aggregates need it anyway) — pagination only bounds what the DOM renders.
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount)
+  const pagedRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  // Soonest stockout first — the 5-row preview must show the MOST urgent items.
   const urgent = useMemo(
-    () => (summary ? summary.recommendations.filter((r) => r.is_urgent) : []),
+    () => (summary ? summary.recommendations.filter((r) => r.is_urgent).sort(compareBySeverity) : []),
     [summary],
   )
+
+  /** This week's whole order plan (all reorder verdicts, independent of search). */
+  const orderPlan = useMemo(() => {
+    if (!summary) return null
+    const items = summary.recommendations.filter((r) => r.type === 'reorder')
+    if (items.length === 0) return null
+    const units = items.reduce((sum, r) => sum + r.suggested_reorder_qty, 0)
+    const cost = items.reduce((sum, r) => sum + r.suggested_reorder_qty * r.unit_cost, 0)
+    const hasRevenue = items.some((r) => r.projected_revenue_30d !== null)
+    const revenue = items.reduce((sum, r) => sum + (r.projected_revenue_30d ?? 0), 0)
+    return {
+      items,
+      units,
+      cost,
+      costIsPartial: items.some((r) => r.unit_cost_is_default),
+      revenue: hasRevenue ? revenue : null,
+    }
+  }, [summary])
+
+  const exportOrderPlan = () => {
+    if (!orderPlan) return
+    const header = [
+      'SKU', 'Product', 'Category', 'On hand', 'Expected sales/week', 'Days of cover',
+      'Suggested order qty', 'Order by', 'Unit cost', 'Est. cost', 'Stockout risk', 'Urgent',
+    ]
+    const lines = [...orderPlan.items].sort(compareBySeverity).map((r) =>
+      [
+        r.sku,
+        r.name,
+        r.category_name ?? '',
+        r.current_stock,
+        perWeek(r.sales_velocity),
+        r.days_of_stock_left === null ? '' : Math.round(r.days_of_stock_left),
+        r.suggested_reorder_qty,
+        r.reorder_by_date ?? 'ASAP',
+        r.unit_cost.toFixed(2),
+        (r.suggested_reorder_qty * r.unit_cost).toFixed(2),
+        r.stockout_risk ?? '',
+        r.is_urgent ? 'yes' : 'no',
+      ]
+        .map(csvEscape)
+        .join(','),
+    )
+    // Leading BOM (U+FEFF) so Excel opens it as UTF-8.
+    const bom = String.fromCharCode(0xfeff)
+    const blob = new Blob([bom + [header.join(','), ...lines].join('\n')], {
+      type: 'text/csv;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `shelfwise-order-plan-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const overstockCash = useMemo(
     () =>
@@ -270,6 +372,27 @@ export function RecommendationsPage() {
       />
 
       <div className="space-y-6">
+        {summary.forecasted_count === 0 && total > 0 && (
+          <Card className="border-l-4 border-l-warning-600">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-600" />
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Forecasts are missing or stale</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Every verdict below is using the {summary.velocity_window_days}-day average fallback —
+                    no demand trends, stockout risk or dead-stock detection until forecasts refresh.
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={onRefreshForecasts} loading={forecasting}>
+                <RefreshCw className="h-4 w-4" />
+                {forecasting ? 'Refreshing (takes a few minutes)…' : 'Refresh forecasts'}
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* KPI cards double as filters — click to focus the list, click again for all. */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -370,6 +493,42 @@ export function RecommendationsPage() {
           </Card>
         )}
 
+        {filter === 'reorder' && orderPlan && (
+          <Card className="border-l-4 border-l-brand-600">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-4">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="inline-flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-brand-600" />
+                  <h2 className="text-sm font-semibold text-slate-900">This week's order plan</h2>
+                </span>
+                <span className="text-sm text-slate-600">
+                  {formatNumber(orderPlan.items.length)} products ·{' '}
+                  <span className="tabular-nums">{formatNumber(orderPlan.units)}</span> units · est. cost{' '}
+                  <span className="font-semibold tabular-nums">{formatCurrency(orderPlan.cost)}</span>
+                  {orderPlan.costIsPartial && (
+                    <Tooltip content="Some products have no unit cost set — the real total will be higher.">
+                      <span className="cursor-help text-slate-400">*</span>
+                    </Tooltip>
+                  )}
+                  {orderPlan.revenue !== null && (
+                    <>
+                      {' '}· protects{' '}
+                      <span className="font-semibold tabular-nums text-success-700">
+                        {formatCurrency(orderPlan.revenue)}
+                      </span>{' '}
+                      of projected 30-day sales
+                    </>
+                  )}
+                </span>
+              </div>
+              <Button variant="secondary" onClick={exportOrderPlan}>
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {(filter === 'overstock' || filter === 'dead_stock') && cashItems.length > 0 && (
           <Card
             title={filter === 'overstock' ? 'Where cash is tied up' : 'Recoverable cash in dead stock'}
@@ -404,7 +563,8 @@ export function RecommendationsPage() {
               message={query ? `No products match “${query}”.` : emptyCopy[filter]}
             />
           ) : (
-            <Table>
+            <>
+              <Table>
               <THead>
                 {showVerdict && <TH>Verdict</TH>}
                 <TH>Product</TH>
@@ -439,7 +599,7 @@ export function RecommendationsPage() {
                 )}
               </THead>
               <TBody>
-                {rows.map((rec) => {
+                {pagedRows.map((rec) => {
                   const present = recommendationPresentation(rec.type)
                   const coverDanger =
                     rec.days_of_stock_left !== null && rec.days_of_stock_left < rec.lead_time_days
@@ -537,7 +697,21 @@ export function RecommendationsPage() {
                   )
                 })}
               </TBody>
-            </Table>
+              </Table>
+              {rows.length > PAGE_SIZE && (
+                <Pagination
+                  meta={{
+                    total: rows.length,
+                    per_page: PAGE_SIZE,
+                    current_page: safePage,
+                    last_page: pageCount,
+                    from: (safePage - 1) * PAGE_SIZE + 1,
+                    to: Math.min(safePage * PAGE_SIZE, rows.length),
+                  }}
+                  onPage={setPage}
+                />
+              )}
+            </>
           )}
         </Card>
       </div>
