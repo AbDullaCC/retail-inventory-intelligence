@@ -301,6 +301,23 @@ final class ChatbotEvaluateCommand extends Command
                 'skip_reason' => 'no categories with stock',
             ],
             [
+                'key' => 'top-category-sales-7d',
+                'question' => 'Which category had the most sales in the last week?',
+                'expect' => function (): ?array {
+                    $rows = app(DashboardServiceInterface::class)->salesByCategory(7);
+                    if ($rows === []) {
+                        return null;
+                    }
+                    $name = (string) $rows[0]['category_name'];
+
+                    return [
+                        'expected' => $name,
+                        'check' => fn (string $a): bool => AnswerChecker::hasText($a, $name),
+                    ];
+                },
+                'skip_reason' => 'no sales in the last 7 days',
+            ],
+            [
                 'key' => 'no-hallucination',
                 'question' => 'Do we sell iPhones? How many do we have in stock?',
                 'expect' => function (): ?array {

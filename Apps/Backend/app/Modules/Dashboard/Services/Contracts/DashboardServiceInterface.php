@@ -25,4 +25,13 @@ interface DashboardServiceInterface
      * @return list<array{product_id: int, sku: string, name: string, units_sold: int, revenue: float}>
      */
     public function topProducts(int $days, int $limit): array;
+
+    /**
+     * Categories ranked by units sold (`out` movements) over the trailing
+     * window — the sales counterpart to trends()' stock-value-by-category
+     * snapshot. Revenue is estimated at current product prices.
+     *
+     * @return list<array{category_id: int, category_name: string, units_sold: int, revenue: float}>
+     */
+    public function salesByCategory(int $days): array;
 }

@@ -8,7 +8,8 @@ use App\Modules\Dashboard\Services\Contracts\DashboardServiceInterface;
 
 /**
  * `get_sales_trends` — daily units in/out over a trailing window (store-wide
- * or for one product) plus stock value by category. The daily series is
+ * or for one product) plus per-category breakdowns: units SOLD by category
+ * over the window and current stock VALUE by category. The daily series is
  * summarised into totals; day-level rows are only included for short windows.
  */
 final class GetSalesTrendsTool
@@ -21,7 +22,7 @@ final class GetSalesTrendsTool
     {
         return new Tool(
             name: 'get_sales_trends',
-            description: 'Sales/receiving activity over the last N days (default 30, max 90): total units sold and received, busiest day, and stock value by category. Pass product_id to narrow to one product. Day-by-day rows included when days <= 31. Use for "how were sales this month?", "which category holds the most value?".',
+            description: 'Sales/receiving activity over the last N days (default 30, max 90): total units sold and received, busiest day, units SOLD per category over the window (units_sold_by_category — server-computed ranking), and current stock value per category. Pass product_id to narrow to one product. Day-by-day rows included when days <= 31. Use for "how were sales this month?", "which category sold the most?", "which category holds the most value?".',
             parameters: [
                 'type' => 'object',
                 'properties' => [
@@ -59,6 +60,8 @@ final class GetSalesTrendsTool
                 }
 
                 if ($productId === null) {
+                    // Ranked server-side — the model must never sum or rank rows itself.
+                    $result['units_sold_by_category'] = $this->dashboard->salesByCategory($days);
                     $result['stock_value_by_category'] = $trends->toArray()['category_values'];
                 }
 
