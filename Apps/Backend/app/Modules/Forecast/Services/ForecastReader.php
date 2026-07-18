@@ -41,8 +41,16 @@ final class ForecastReader implements ForecastReaderInterface
 
         foreach ($forecasts as $forecast) {
             $modelMix[$forecast->model_used] = ($modelMix[$forecast->model_used] ?? 0) + 1;
-            $units30d += $forecast->expected_daily_demand * 30;
-            $revenue30d += $forecast->expected_daily_demand * 30 * (float) ($forecast->product->price ?? 0);
+
+            // Sum the first 30 days of the actual curve (padding beyond the
+            // horizon with the flat average) — keeps this KPI identical to the
+            // Intelligence layer's curve-based 30-day projection.
+            $means = array_map(static fn (array $point): float => (float) $point['mean'], $forecast->daily_forecast);
+            $next30 = (float) array_sum(array_slice($means, 0, 30))
+                + max(0, 30 - count($means)) * $forecast->expected_daily_demand;
+
+            $units30d += $next30;
+            $revenue30d += $next30 * (float) ($forecast->product->price ?? 0);
             $latest = $latest === null ? $forecast->generated_at : max($latest, $forecast->generated_at);
 
             foreach ($forecast->daily_forecast as $point) {

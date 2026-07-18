@@ -91,6 +91,73 @@ class ReorderCalculatorForecastTest extends TestCase
         $this->assertSame('TSB', $m->modelUsed);
     }
 
+    public function test_front_loaded_demand_trips_the_trigger_even_when_flat_cover_looks_safe(): void
+    {
+        // 6/day for 10 days then 1/day: overall mean ≈ 2.79 → flat cover ≈ 10.8d
+        // (a flat rule would say healthy), but the curve exhausts 30 units by day 4.
+        $means = array_merge(array_fill(0, 10, 6.0), array_fill(0, 18, 1.0));
+        $mean = array_sum($means) / 28;
+
+        $m = $this->calc->analyze(
+            currentStock: 30,
+            unitsOutInWindow: 0,
+            leadTimeDays: 7,
+            unitCost: 1.0,
+            today: $this->today,
+            forecast: $this->snapshot(expectedDaily: $mean, dailyMeans: $means),
+        );
+
+        $this->assertSame('reorder', $m->type);
+        $this->assertTrue($m->isUrgent, 'stockout on day 4 is inside the 7-day lead time');
+        $this->assertSame('2026-07-01', $m->reorderByDate);
+        $this->assertSame('2026-07-05', $m->projectedStockoutDate);
+        // The displayed average-rate cover still reads "safe"; the reasoning
+        // must carry the stockout date so the verdict stays explainable.
+        $this->assertEqualsWithDelta(30 / $mean, $m->daysOfStockLeft, 1e-9);
+        $this->assertStringContainsString('2026-07-05', $m->reasoning);
+    }
+
+    public function test_back_loaded_demand_defers_the_reorder_a_flat_rule_would_have_fired(): void
+    {
+        // 1/day for 10 days then 6/day: flat cover ≈ 9.5d (< 10) would fire a
+        // flat rule, but the curve doesn't exhaust 40 units until day 14.
+        $means = array_merge(array_fill(0, 10, 1.0), array_fill(0, 18, 6.0));
+        $mean = array_sum($means) / 28;
+
+        $m = $this->calc->analyze(
+            currentStock: 40,
+            unitsOutInWindow: 0,
+            leadTimeDays: 7,
+            unitCost: 1.0,
+            today: $this->today,
+            forecast: $this->snapshot(expectedDaily: $mean, dailyMeans: $means),
+        );
+
+        $this->assertSame('healthy', $m->type);
+        $this->assertFalse($m->needsReorder);
+        $this->assertFalse($m->isUrgent);
+        // Stockout on day 14, minus the 7-day lead → order by day 7.
+        $this->assertSame('2026-07-15', $m->projectedStockoutDate);
+        $this->assertSame('2026-07-08', $m->reorderByDate);
+    }
+
+    public function test_reorder_by_beyond_the_horizon_extends_the_curve_at_the_flat_average(): void
+    {
+        $m = $this->calc->analyze(
+            currentStock: 200,
+            unitsOutInWindow: 0,
+            leadTimeDays: 7,
+            unitCost: 1.0,
+            today: $this->today,
+            forecast: $this->snapshot(), // flat 4/day, horizon 28
+        );
+
+        // 28 curve days cover 112 units; 22 padded days at 4/day reach 200 on
+        // day index 49 → order by day 42.
+        $this->assertSame('2026-08-12', $m->reorderByDate);
+        $this->assertNull($m->projectedStockoutDate, 'chart-facing date stays horizon-bounded');
+    }
+
     public function test_projected_stockout_date_walks_the_daily_curve(): void
     {
         $means = array_merge([1.0, 1.0, 1.0, 5.0], array_fill(0, 24, 5.0));
@@ -162,6 +229,30 @@ class ReorderCalculatorForecastTest extends TestCase
             forecast: $this->snapshot(actualsLast28d: 0.0),
         );
         $this->assertNull($none->demandTrendPct);
+    }
+
+    public function test_projections_and_cash_follow_the_daily_curve_not_the_flat_average(): void
+    {
+        // Ramping demand 1..28 (sum 406) — a flat mean × 30 would erase the ramp.
+        $means = array_map(static fn (int $d): float => (float) $d, range(1, 28));
+
+        $m = $this->calc->analyze(
+            currentStock: 500,
+            unitsOutInWindow: 0,
+            leadTimeDays: 7,
+            unitCost: 2.0,
+            today: $this->today,
+            forecast: $this->snapshot(expectedDaily: 14.5, dailyMeans: $means, actualsLast28d: 203.0),
+            unitPrice: 10.0,
+        );
+
+        // 30-day projection = curve sum (406) + 2 padded days × 14.5 = 435.
+        $this->assertEqualsWithDelta(435.0, $m->projectedUnits30d, 1e-9);
+        $this->assertEqualsWithDelta(4350.0, $m->projectedRevenue30d, 1e-9);
+        // Trend: next-28 curve (406) vs last-28 actuals (203) → +100%.
+        $this->assertEqualsWithDelta(100.0, $m->demandTrendPct, 1e-9);
+        // Cash beyond the next 30 days of curve demand: (500 − 435) × $2.
+        $this->assertEqualsWithDelta(130.0, $m->cashTiedUp, 1e-9);
     }
 
     public function test_dead_stock_verdict_when_the_model_expects_no_demand(): void

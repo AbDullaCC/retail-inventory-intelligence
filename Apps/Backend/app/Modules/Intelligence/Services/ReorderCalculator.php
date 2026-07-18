@@ -16,11 +16,14 @@ use DateTimeImmutable;
  *
  * When a {@see ForecastSnapshot} is provided (passed in, never fetched — the
  * calculator stays pure), the demand estimate comes from the time-series model:
- * velocity becomes the model's expected daily demand, the suggested order
- * covers the forecast demand plus a safety buffer sized from the p90 band, and
- * the forecast-only insights (projected stockout date, stockout risk, demand
- * trend, projected revenue, dead-stock detection) light up. Without a snapshot
- * the behaviour is exactly the historical window-average formula.
+ * velocity becomes the model's expected daily demand, the reorder trigger and
+ * reorder-by date come from walking the daily curve (projected stockout day
+ * minus the lead time — so front-loaded demand can trip the trigger even when
+ * the average-rate cover looks safe), the suggested order covers the forecast
+ * demand plus a safety buffer sized from the p90 band, and the forecast-only
+ * insights (projected stockout date, stockout risk, demand trend, projected
+ * revenue, dead-stock detection) light up. Without a snapshot the behaviour is
+ * exactly the historical window-average formula.
  *
  * All intermediate maths stay in floats; rounding is confined to the human
  * readable reasoning string (and to callers rendering the values).
@@ -59,9 +62,23 @@ final class ReorderCalculator
             ? $currentStock / $salesVelocity
             : null;
 
-        // 3. needs reorder?
-        $needsReorder = $daysOfStockLeft !== null
-            && $daysOfStockLeft < ($leadTimeDays + $config->safetyBufferDays);
+        // 3. reorder trigger & timing. Model mode walks the daily curve: the
+        //    trigger fires when the projected stockout day lands inside the
+        //    lead-time + safety window, and the reorder-by date is that day
+        //    minus the lead time — so front-loaded demand trips the trigger
+        //    even when average-rate cover looks safe, and back-loaded demand
+        //    doesn't fire it early. Fallback keeps the flat rule byte-identical.
+        if ($usingForecast && $daysOfStockLeft !== null) {
+            $stockoutDay = $this->daysUntilStockout($currentStock, $forecast);
+            $needsReorder = $stockoutDay < ($leadTimeDays + $config->safetyBufferDays);
+            $offsetDays = $stockoutDay - $leadTimeDays;
+        } else {
+            $needsReorder = $daysOfStockLeft !== null
+                && $daysOfStockLeft < ($leadTimeDays + $config->safetyBufferDays);
+            $offsetDays = $daysOfStockLeft !== null
+                ? (int) floor($daysOfStockLeft - $leadTimeDays)
+                : null;
+        }
 
         // 4. suggested reorder quantity (cover lead time + coverage period).
         //    Forecast mode sums the actual daily curve and adds a safety buffer
@@ -75,11 +92,10 @@ final class ReorderCalculator
             $suggestedReorderQty = (int) ceil($salesVelocity * ($leadTimeDays + $config->coveragePeriodDays));
         }
 
-        // 5. reorder-by date = today + floor(daysLeft - leadTime); <= 0 means order today (urgent)
+        // 5. reorder-by date = today + slack days from step 3; <= 0 means order today (urgent)
         $reorderByDate = null;
         $isUrgent = false;
-        if ($daysOfStockLeft !== null) {
-            $offsetDays = (int) floor($daysOfStockLeft - $leadTimeDays);
+        if ($offsetDays !== null) {
             if ($offsetDays <= 0) {
                 $isUrgent = true;
                 $reorderByDate = $today->format('Y-m-d');
@@ -92,8 +108,13 @@ final class ReorderCalculator
         $isOverstocked = $daysOfStockLeft !== null
             && $daysOfStockLeft > $config->overstockThresholdDays;
 
-        // 7. cash tied up in stock beyond what's needed
-        $cashTiedUp = max(0.0, $currentStock - $salesVelocity * $config->neededStockDays) * $unitCost;
+        // 7. cash tied up in stock beyond what's needed (the next ~30 days of
+        //    demand). Model mode sums the actual daily curve so seasonality
+        //    isn't flattened into an average; fallback keeps the flat formula.
+        $demandOverNeededDays = $usingForecast
+            ? $this->demandOverNextDays($forecast, $config->neededStockDays)
+            : $salesVelocity * $config->neededStockDays;
+        $cashTiedUp = max(0.0, $currentStock - $demandOverNeededDays) * $unitCost;
 
         // 8. dead stock (forecast mode only): the model expects demand to have
         //    effectively stopped while units are still on the shelf.
@@ -108,6 +129,13 @@ final class ReorderCalculator
             default => 'healthy',
         };
 
+        // 30-day projections follow the daily curve, not the flat average —
+        // for seasonal models (MSTL) the next 30 days can differ materially
+        // from the horizon-wide mean × 30.
+        $projectedUnits30d = $usingForecast ? $this->demandOverNextDays($forecast, 30) : null;
+
+        $projectedStockoutDate = $usingForecast ? $this->projectedStockoutDate($currentStock, $forecast, $today) : null;
+
         return new RecommendationMetrics(
             type: $type,
             salesVelocity: $salesVelocity,
@@ -118,19 +146,51 @@ final class ReorderCalculator
             isUrgent: $isUrgent,
             isOverstocked: $isOverstocked,
             cashTiedUp: $cashTiedUp,
-            reasoning: $this->reasoning($type, $salesVelocity, $daysOfStockLeft, $leadTimeDays, $suggestedReorderQty, $cashTiedUp, $config, $forecast),
+            reasoning: $this->reasoning($type, $salesVelocity, $daysOfStockLeft, $leadTimeDays, $suggestedReorderQty, $cashTiedUp, $config, $forecast, $projectedStockoutDate),
             currentStock: $currentStock,
             leadTimeDays: $leadTimeDays,
             unitCost: $unitCost,
             forecastSource: $usingForecast ? 'model' : 'fallback',
             modelUsed: $forecast?->modelUsed,
             forecastGeneratedAt: $forecast?->generatedAt->format('c'),
-            projectedStockoutDate: $usingForecast ? $this->projectedStockoutDate($currentStock, $forecast, $today) : null,
+            projectedStockoutDate: $projectedStockoutDate,
             stockoutRisk: $usingForecast && ! $isDeadStock ? $this->stockoutRisk($currentStock, $forecast, $config) : null,
             demandTrendPct: $usingForecast ? $this->demandTrendPct($forecast) : null,
-            projectedUnits30d: $usingForecast ? $forecast->expectedDailyDemand * 30 : null,
-            projectedRevenue30d: $usingForecast ? $forecast->expectedDailyDemand * 30 * $unitPrice : null,
+            projectedUnits30d: $projectedUnits30d,
+            projectedRevenue30d: $projectedUnits30d !== null ? $projectedUnits30d * $unitPrice : null,
         );
+    }
+
+    /**
+     * Expected demand over the next $days, summed from the daily forecast
+     * curve; days beyond the stored horizon fall back to the flat average.
+     */
+    private function demandOverNextDays(ForecastSnapshot $forecast, int $days): float
+    {
+        $curve = array_slice($forecast->dailyMeans, 0, $days);
+
+        return (float) array_sum($curve)
+            + max(0, $days - count($curve)) * $forecast->expectedDailyDemand;
+    }
+
+    /**
+     * Day index (0 = today) on which cumulative expected demand first reaches
+     * the on-hand stock. Follows the daily curve within the horizon, then
+     * extends at the flat average — beyond the horizon this converges to the
+     * plain stock ÷ velocity cover. Caller guarantees expectedDailyDemand > 0.
+     */
+    private function daysUntilStockout(int $currentStock, ForecastSnapshot $forecast): int
+    {
+        $cumulative = 0.0;
+        foreach ($forecast->dailyMeans as $day => $mean) {
+            $cumulative += $mean;
+            if ($cumulative >= $currentStock) {
+                return $day;
+            }
+        }
+
+        return count($forecast->dailyMeans) - 1
+            + (int) ceil(($currentStock - $cumulative) / $forecast->expectedDailyDemand);
     }
 
     /**
@@ -182,7 +242,7 @@ final class ReorderCalculator
             return null;
         }
 
-        return ($forecast->expectedDailyDemand * 28 - $forecast->actualsLast28d) / $forecast->actualsLast28d * 100.0;
+        return ($this->demandOverNextDays($forecast, 28) - $forecast->actualsLast28d) / $forecast->actualsLast28d * 100.0;
     }
 
     /**
@@ -199,6 +259,7 @@ final class ReorderCalculator
         float $cashTiedUp,
         ReorderConfig $config,
         ?ForecastSnapshot $forecast,
+        ?string $projectedStockoutDate = null,
     ): string {
         if ($forecast === null) {
             return $this->fallbackReasoning($type, $salesVelocity, $daysOfStockLeft, $leadTimeDays, $suggestedReorderQty, $cashTiedUp, $config);
@@ -209,14 +270,26 @@ final class ReorderCalculator
         $days = $daysOfStockLeft === null ? 0 : (int) round($daysOfStockLeft);
 
         return match ($type) {
-            'reorder' => sprintf(
-                'Forecast (%s): ~%d/week expected with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout.',
-                $model,
-                $perWeek,
-                $days,
-                $leadTimeDays,
-                $suggestedReorderQty,
-            ),
+            // The trigger walks the daily curve, so the explanation must too:
+            // quoting average-rate cover here could contradict the verdict
+            // when demand is front-loaded.
+            'reorder' => $projectedStockoutDate !== null
+                ? sprintf(
+                    'Forecast (%s): ~%d/week expected — the daily curve projects a stockout around %s. With a %d-day lead time, order %d units now.',
+                    $model,
+                    $perWeek,
+                    $projectedStockoutDate,
+                    $leadTimeDays,
+                    $suggestedReorderQty,
+                )
+                : sprintf(
+                    'Forecast (%s): ~%d/week expected with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout.',
+                    $model,
+                    $perWeek,
+                    $days,
+                    $leadTimeDays,
+                    $suggestedReorderQty,
+                ),
             'dead_stock' => sprintf(
                 'Forecast (%s): demand has effectively stopped — about $%s could be freed by clearing the remaining stock.',
                 $model,
