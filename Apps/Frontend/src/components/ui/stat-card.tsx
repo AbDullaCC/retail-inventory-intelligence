@@ -92,7 +92,7 @@ export function StatCard({ label, value, icon, tone = 'default', delta, deltaLab
         <div>
           <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{value}</p>
           {(showDelta || hint) && (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
               {showDelta && (
                 <span
                   className={cn(

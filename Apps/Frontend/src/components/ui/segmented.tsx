@@ -20,8 +20,10 @@ export function SegmentedControl<T extends string>({
   className,
 }: SegmentedControlProps<T>) {
   return (
+    // Plain toggle buttons (aria-pressed), not tabs — the tab role promises
+    // arrow-key navigation this control doesn't implement.
     <div
-      role="tablist"
+      role="group"
       className={cn('inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1', className)}
     >
       {options.map((option) => {
@@ -30,8 +32,7 @@ export function SegmentedControl<T extends string>({
           <button
             key={option.value}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',

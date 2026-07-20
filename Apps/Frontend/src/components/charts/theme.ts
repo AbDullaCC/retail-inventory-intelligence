@@ -9,6 +9,10 @@ export const chartColors = {
   infoDark: '#0369a1',
   infoSoft: '#e0f2fe',
   warning: '#d97706',
+  danger: '#dc2626',
+  success: '#16a34a',
+  // Neutral status fill (e.g. "no sales") — slate-500 keeps ≥3:1 on white.
+  slate: '#64748b',
   axis: '#94a3b8',
   grid: '#e2e8f0',
 }

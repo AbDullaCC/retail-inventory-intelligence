@@ -1,13 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   AlertTriangle,
   Archive,
   CheckCircle2,
-  ClipboardList,
   Download,
   Info,
+  PackagePlus,
   RefreshCw,
   Search,
   TrendingDown,
@@ -17,9 +18,11 @@ import { forecastApi } from '../api/forecast'
 import { intelligenceApi } from '../api/intelligence'
 import { apiErrorMessage } from '../lib/api'
 import { formatCurrency, formatDelta, formatNumber, formatShortDate } from '../lib/format'
+import { coverDistribution, upcomingStockouts } from '../lib/insights'
 import {
   compareBySeverity,
   perWeek,
+  perWeekLabel,
   recommendationPresentation,
   reorderByLabel,
 } from '../lib/recommendation'
@@ -54,6 +57,8 @@ import type {
 } from '../types'
 
 const CashTiedUpChart = lazy(() => import('../components/charts/CashTiedUpChart'))
+const CoverDistributionChart = lazy(() => import('../components/charts/CoverDistributionChart'))
+const UpcomingStockoutsChart = lazy(() => import('../components/charts/UpcomingStockoutsChart'))
 
 type Filter = 'all' | RecommendationType
 
@@ -121,8 +126,14 @@ function csvEscape(value: string | number | null | undefined): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+const riskLabels: Record<StockoutRisk, string> = {
+  high: 'High risk',
+  medium: 'Medium risk',
+  low: 'Low risk',
+}
+
 function RiskBadge({ risk }: { risk: StockoutRisk }) {
-  return <Badge tone={riskTones[risk]}>{risk} risk</Badge>
+  return <Badge tone={riskTones[risk]}>{riskLabels[risk]}</Badge>
 }
 
 function coverLabel(rec: Recommendation): string {
@@ -309,6 +320,16 @@ export function RecommendationsPage() {
     [rows],
   )
 
+  // Insight-panel data. The stockout timeline only counts reorder rows
+  // (other verdicts have no near-term dates); the cover histogram tracks
+  // whatever the list currently shows, search included.
+  const stockoutDays = useMemo(
+    () => upcomingStockouts(filter === 'reorder' ? rows : [], summary?.default_lead_time_days ?? 7),
+    [rows, filter, summary],
+  )
+  const coverBuckets = useMemo(() => coverDistribution(rows), [rows])
+  const hasStockoutDates = stockoutDays.some((d) => d.count > 0)
+
   if (loading) {
     return (
       <div>
@@ -354,6 +375,71 @@ export function RecommendationsPage() {
 
   const dirFor = (key: SortKey): SortDir | null => (sort?.key === key ? sort.dir : null)
 
+  // One persistent insight slot between the KPIs and the table: the content
+  // follows the selected verdict, but the card itself never appears or
+  // disappears — no layout jump when a KPI filter is clicked.
+  const insight: { title: string; subtitle: ReactNode; chart: ReactNode } = (() => {
+    if (filter === 'reorder') {
+      return {
+        title: "This week's order plan",
+        subtitle: orderPlan ? (
+          <>
+            {formatNumber(orderPlan.items.length)} products ·{' '}
+            <span className="tabular-nums">{formatNumber(orderPlan.units)}</span> units · est. cost{' '}
+            <span className="font-medium tabular-nums">{formatCurrency(orderPlan.cost)}</span>
+            {orderPlan.costIsPartial && (
+              <Tooltip content="Some products have no unit cost set — the real total will be higher.">
+                <span tabIndex={0} className="cursor-help text-slate-500">
+                  *
+                </span>
+              </Tooltip>
+            )}
+            {orderPlan.revenue !== null && (
+              <>
+                {' '}
+                · protects{' '}
+                <span className="font-medium tabular-nums text-success-700">
+                  {formatCurrency(orderPlan.revenue)}
+                </span>{' '}
+                of projected 30-day sales
+              </>
+            )}
+          </>
+        ) : (
+          'No products need reordering right now.'
+        ),
+        chart: hasStockoutDates ? (
+          <UpcomingStockoutsChart
+            days={stockoutDays}
+            leadTimeDays={summary.default_lead_time_days}
+            height={236}
+          />
+        ) : (
+          // No stockout dates (stale/missing forecasts) — degrade to the
+          // cover histogram instead of an empty timeline.
+          <CoverDistributionChart buckets={coverBuckets} />
+        ),
+      }
+    }
+    if (filter === 'overstock' || filter === 'dead_stock') {
+      return {
+        title: filter === 'overstock' ? 'Where cash is tied up' : 'Recoverable cash in dead stock',
+        subtitle: 'Top products by cash locked in stock — click a bar to open the product',
+        chart:
+          cashItems.length > 0 ? (
+            <CashTiedUpChart items={cashItems} onSelect={(id) => navigate(`/products/${id}`)} />
+          ) : (
+            <CoverDistributionChart buckets={coverBuckets} />
+          ),
+      }
+    }
+    return {
+      title: filter === 'healthy' ? 'Cover runway — healthy products' : 'Cover runway',
+      subtitle: 'How long current stock lasts at expected demand, for the products listed below',
+      chart: <CoverDistributionChart buckets={coverBuckets} />,
+    }
+  })()
+
   return (
     <div>
       <PageHeader
@@ -365,7 +451,11 @@ export function RecommendationsPage() {
             <Tooltip
               content={`Lead time defaults to ${summary.default_lead_time_days} days. Products without a fresh forecast fall back to the ${summary.velocity_window_days}-day average.`}
             >
-              <Info className="h-3.5 w-3.5 cursor-help text-slate-400" aria-label="About forecast defaults" />
+              <Info
+                tabIndex={0}
+                className="h-3.5 w-3.5 cursor-help text-slate-400"
+                aria-label="About forecast defaults"
+              />
             </Tooltip>
           </span>
         }
@@ -399,7 +489,7 @@ export function RecommendationsPage() {
             label="Need reorder"
             value={formatNumber(summary.reorder_count)}
             tone="danger"
-            icon={<TrendingDown className="h-5 w-5" />}
+            icon={<PackagePlus className="h-5 w-5" />}
             hint={urgent.length > 0 ? `${formatNumber(urgent.length)} to order today` : 'none urgent'}
             onClick={() => toggleFilter('reorder')}
             active={filter === 'reorder'}
@@ -493,54 +583,22 @@ export function RecommendationsPage() {
           </Card>
         )}
 
-        {filter === 'reorder' && orderPlan && (
-          <Card className="border-l-4 border-l-brand-600">
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-4">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="inline-flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-brand-600" />
-                  <h2 className="text-sm font-semibold text-slate-900">This week's order plan</h2>
-                </span>
-                <span className="text-sm text-slate-600">
-                  {formatNumber(orderPlan.items.length)} products ·{' '}
-                  <span className="tabular-nums">{formatNumber(orderPlan.units)}</span> units · est. cost{' '}
-                  <span className="font-semibold tabular-nums">{formatCurrency(orderPlan.cost)}</span>
-                  {orderPlan.costIsPartial && (
-                    <Tooltip content="Some products have no unit cost set — the real total will be higher.">
-                      <span className="cursor-help text-slate-400">*</span>
-                    </Tooltip>
-                  )}
-                  {orderPlan.revenue !== null && (
-                    <>
-                      {' '}· protects{' '}
-                      <span className="font-semibold tabular-nums text-success-700">
-                        {formatCurrency(orderPlan.revenue)}
-                      </span>{' '}
-                      of projected 30-day sales
-                    </>
-                  )}
-                </span>
-              </div>
+        <Card
+          title={insight.title}
+          subtitle={insight.subtitle}
+          actions={
+            filter === 'reorder' && orderPlan ? (
               <Button variant="secondary" onClick={exportOrderPlan}>
                 <Download className="h-4 w-4" />
                 Export CSV
               </Button>
-            </div>
-          </Card>
-        )}
-
-        {(filter === 'overstock' || filter === 'dead_stock') && cashItems.length > 0 && (
-          <Card
-            title={filter === 'overstock' ? 'Where cash is tied up' : 'Recoverable cash in dead stock'}
-            subtitle="Top products by cash locked in stock — click a bar to open the product"
-          >
-            <div className="p-4">
-              <Suspense fallback={<ChartSkeleton height={260} />}>
-                <CashTiedUpChart items={cashItems} onSelect={(id) => navigate(`/products/${id}`)} />
-              </Suspense>
-            </div>
-          </Card>
-        )}
+            ) : undefined
+          }
+        >
+          <div className="p-4">
+            <Suspense fallback={<ChartSkeleton height={260} />}>{insight.chart}</Suspense>
+          </div>
+        </Card>
 
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
@@ -568,7 +626,12 @@ export function RecommendationsPage() {
               <THead>
                 {showVerdict && <TH>Verdict</TH>}
                 <TH>Product</TH>
-                <TH sortable sortDir={dirFor('trend')} onSort={() => toggleSort('trend')}>
+                <TH
+                  sortable
+                  sortDir={dirFor('trend')}
+                  onSort={() => toggleSort('trend')}
+                  title="Model-expected demand for the next 28 days vs actual sales in the last 28"
+                >
                   Trend
                 </TH>
                 {showReorderCols && <TH>Risk</TH>}
@@ -628,7 +691,7 @@ export function RecommendationsPage() {
                         >
                           {rec.name}
                         </Link>
-                        <div className="font-mono text-xs text-slate-400">
+                        <div className="font-mono text-xs text-slate-500">
                           {rec.sku}
                           {rec.category_name && ` · ${rec.category_name}`}
                           {!rec.is_active && ' · inactive'}
@@ -642,7 +705,7 @@ export function RecommendationsPage() {
                           }
                           className="mt-1"
                         >
-                          <span className="line-clamp-1 max-w-xs text-xs text-slate-400">
+                          <span tabIndex={0} className="line-clamp-1 max-w-xs text-xs text-slate-500">
                             {rec.reasoning}
                           </span>
                         </Tooltip>
@@ -663,7 +726,7 @@ export function RecommendationsPage() {
                         {formatNumber(rec.current_stock)}
                       </TD>
                       <TD numeric className="text-slate-600">
-                        {formatNumber(perWeek(rec.sales_velocity))}
+                        {perWeekLabel(rec.sales_velocity)}
                       </TD>
                       <TD numeric className={coverDanger ? 'text-danger-600' : 'text-slate-600'}>
                         {coverLabel(rec)}

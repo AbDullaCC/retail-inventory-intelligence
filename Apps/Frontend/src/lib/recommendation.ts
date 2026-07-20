@@ -1,5 +1,5 @@
 import type { Recommendation, RecommendationType } from '../types'
-import { formatShortDate } from './format'
+import { formatNumber, formatShortDate } from './format'
 
 type Tone = 'green' | 'red' | 'amber' | 'indigo' | 'gray'
 
@@ -25,6 +25,13 @@ export function recommendationPresentation(type: RecommendationType): Recommenda
 /** Sales velocity expressed per week, rounded for display only. */
 export function perWeek(velocity: number): number {
   return Math.round(velocity * 7)
+}
+
+/** Sales/week for display — slow movers show "<1" instead of a misleading "0". */
+export function perWeekLabel(velocity: number): string {
+  const weekly = perWeek(velocity)
+  if (weekly === 0 && velocity > 0) return '<1'
+  return formatNumber(weekly)
 }
 
 /** Human label for the reorder-by date ("Today" when urgent, "Jul 20" otherwise). */

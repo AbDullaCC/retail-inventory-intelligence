@@ -6,7 +6,7 @@ interface CardProps {
   children: ReactNode
   /** Renders a header bar: title/subtitle left, actions right. */
   title?: string
-  subtitle?: string
+  subtitle?: ReactNode
   actions?: ReactNode
 }
 

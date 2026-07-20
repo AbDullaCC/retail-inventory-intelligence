@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   compareBySeverity,
   perWeek,
+  perWeekLabel,
   recommendationPresentation,
   reorderByLabel,
 } from './recommendation'
@@ -21,6 +22,14 @@ describe('perWeek', () => {
     expect(perWeek(4)).toBe(28)
     expect(perWeek(0.5)).toBe(4) // 3.5 → 4
     expect(perWeek(0)).toBe(0)
+  })
+})
+
+describe('perWeekLabel', () => {
+  it('shows "<1" for slow movers instead of a misleading zero', () => {
+    expect(perWeekLabel(0.05)).toBe('<1')
+    expect(perWeekLabel(0)).toBe('0')
+    expect(perWeekLabel(4)).toBe('28')
   })
 })
 

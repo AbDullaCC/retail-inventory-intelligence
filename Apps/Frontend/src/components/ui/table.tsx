@@ -55,6 +55,9 @@ export function TH({ align = 'left', sortable, sortDir, onSort, className, child
 
   return (
     <th
+      aria-sort={
+        sortable ? (sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : 'none') : undefined
+      }
       className={cn(
         'px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500',
         align === 'right' ? 'text-right' : 'text-left',
