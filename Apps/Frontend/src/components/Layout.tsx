@@ -1,9 +1,11 @@
 import { Suspense, lazy, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Plug, Sparkles, Tags } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, LogOut, Menu, Package, Plug, Tags } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { APP_NAME } from '../lib/brand'
 import { Avatar, Drawer, Skeleton, Tooltip, cn } from './ui'
+import { AssistantGlyph } from './chat/AssistantGlyph'
 import { LogoWordmark } from './Logo'
 
 // Lazy so catalog pages don't pay the chat bundle cost (same pattern as charts).
@@ -159,21 +161,40 @@ export function Layout() {
       <button
         type="button"
         onClick={() => setAssistantOpen(true)}
-        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-pop transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+        className="group fixed bottom-5 right-5 z-40 rounded-2xl transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 motion-safe:hover:scale-105 motion-safe:active:scale-95"
         aria-label="Open the AI assistant"
       >
-        <Sparkles className="h-5 w-5" />
+        <AssistantGlyph
+          className="h-12 w-12 rounded-2xl shadow-pop ring-1 ring-white/25 ring-inset"
+          iconClassName="h-5 w-5 transition-transform motion-safe:group-hover:rotate-12"
+        />
       </button>
 
       <Drawer
         open={assistantOpen}
         onClose={() => setAssistantOpen(false)}
-        title="Assistant"
-        subtitle="Answers from your live inventory data"
+        padded={false}
+        header={
+          <div className="flex items-center gap-3">
+            <AssistantGlyph className="h-9 w-9 rounded-xl shadow-card" iconClassName="h-4 w-4" />
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight text-slate-900">
+                {APP_NAME} Assistant
+              </h2>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-success-600 opacity-60 motion-safe:animate-ping" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success-600" />
+                </span>
+                Connected to your live inventory
+              </p>
+            </div>
+          </div>
+        }
       >
         <Suspense
           fallback={
-            <div className="space-y-3">
+            <div className="space-y-3 p-5">
               <Skeleton className="h-10 w-3/4" />
               <Skeleton className="h-10 w-1/2" />
             </div>

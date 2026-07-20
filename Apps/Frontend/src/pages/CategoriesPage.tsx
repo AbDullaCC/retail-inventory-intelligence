@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import toast from 'react-hot-toast'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import { categoriesApi } from '../api/categories'
 import { apiErrorMessage } from '../lib/api'
 import {
@@ -121,6 +121,7 @@ export function CategoriesPage() {
           <TableSkeleton rows={6} cols={5} />
         ) : categories.length === 0 ? (
           <EmptyState
+            illustration={<Tags className="h-5 w-5" />}
             title="No categories yet"
             message="Create your first category to start adding products."
             action={
@@ -144,7 +145,17 @@ export function CategoriesPage() {
             <TBody>
               {categories.map((category) => (
                 <tr key={category.id} className="transition-colors hover:bg-slate-50/80">
-                  <TD className="font-medium text-slate-900">{category.name}</TD>
+                  <TD>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-xs font-semibold text-brand-800 ring-1 ring-inset ring-brand-200/60"
+                        aria-hidden="true"
+                      >
+                        {category.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="font-medium text-slate-900">{category.name}</span>
+                    </div>
+                  </TD>
                   <TD className="max-w-md truncate text-slate-500">{category.description ?? '—'}</TD>
                   <TD numeric>
                     <Badge tone="gray">{category.products_count ?? 0}</Badge>

@@ -13,7 +13,7 @@ export function MessageList({ messages, thinking }: { messages: ChatMessage[]; t
   }, [messages.length, thinking])
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+    <div className="chat-surface flex-1 space-y-4 overflow-y-auto px-4 py-4">
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}

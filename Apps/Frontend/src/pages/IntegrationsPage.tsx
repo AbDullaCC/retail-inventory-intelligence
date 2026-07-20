@@ -153,23 +153,31 @@ export function IntegrationsPage() {
                 <Plug className="h-4 w-4 text-brand-600" />
                 How to connect
               </p>
-              <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-600">
-                {setupSteps.map((step) => (
-                  <li key={step}>{step}</li>
+              <ol className="mt-4 space-y-3">
+                {setupSteps.map((step, index) => (
+                  <li key={step} className="flex gap-3 text-sm leading-relaxed text-slate-600">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 font-mono text-[11px] font-semibold text-brand-700 ring-1 ring-inset ring-brand-200">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
                 ))}
               </ol>
               <a
                 href="https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/generate-app-access-tokens-admin"
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
+                className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
               >
                 Shopify's guide to custom app tokens
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </div>
 
-            <form onSubmit={onConnect} className="space-y-4">
+            <form
+              onSubmit={onConnect}
+              className="h-fit space-y-4 rounded-xl bg-slate-50/70 p-5 ring-1 ring-slate-200/70"
+            >
               <Field label="Store domain" htmlFor="shopify-domain" required>
                 <Input
                   id="shopify-domain"

@@ -66,7 +66,11 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-      {illustration && <div className="mb-2 text-slate-300">{illustration}</div>}
+      {illustration && (
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100/80 text-slate-400 ring-1 ring-inset ring-slate-200/60">
+          {illustration}
+        </div>
+      )}
       <p className="text-sm font-medium text-slate-700">{title}</p>
       {message && <p className="max-w-sm text-sm text-slate-400">{message}</p>}
       {action && <div className="mt-2">{action}</div>}

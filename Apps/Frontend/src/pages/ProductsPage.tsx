@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Eye, PackageSearch, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { categoriesApi } from '../api/categories'
 import { productsApi } from '../api/products'
 import type { ProductFilters, ProductPayload } from '../api/products'
@@ -299,6 +299,7 @@ export function ProductsPage() {
           <TableSkeleton rows={10} cols={6} />
         ) : products.length === 0 ? (
           <EmptyState
+            illustration={<PackageSearch className="h-5 w-5" />}
             title="No products found"
             message="Try adjusting your filters, or add a new product."
             action={

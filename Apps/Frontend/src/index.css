@@ -52,6 +52,8 @@
 
   --animate-shelf-in: shelf-in 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-panel-in: panel-in 0.25s ease-out;
+  --animate-msg-in: msg-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-chat-dot: chat-dot 1.2s ease-in-out infinite;
 }
 
 /* One-time reveals; only applied under motion-safe. */
@@ -66,6 +68,34 @@
     opacity: 0;
     transform: translateY(4px);
   }
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes chat-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* The assistant's conversation canvas: faint graph-paper dots — a data
+ * instrument, not a generic chat window. */
+.chat-surface {
+  background-color: var(--color-slate-50);
+  background-image: radial-gradient(var(--color-slate-200) 1px, transparent 1px);
+  background-size: 14px 14px;
 }
 
 :root {
