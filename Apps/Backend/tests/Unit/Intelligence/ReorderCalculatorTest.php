@@ -50,6 +50,8 @@ class ReorderCalculatorTest extends TestCase
         $this->assertSame('2026-07-01', $m->reorderByDate);
 
         $this->assertStringContainsString('order 84 units', $m->reasoning);
+        // The qty must explain itself: 84 = 4/day × (7 lead + 14 coverage).
+        $this->assertStringContainsString('enough to cover ~21 days at the current rate', $m->reasoning);
     }
 
     public function test_overstock_case(): void

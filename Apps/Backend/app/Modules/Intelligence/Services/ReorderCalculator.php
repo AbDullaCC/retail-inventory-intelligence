@@ -275,20 +275,22 @@ final class ReorderCalculator
             // when demand is front-loaded.
             'reorder' => $projectedStockoutDate !== null
                 ? sprintf(
-                    'Forecast (%s): ~%d/week expected — the daily curve projects a stockout around %s. With a %d-day lead time, order %d units now.',
+                    'Forecast (%s): ~%d/week expected — the daily curve projects a stockout around %s. With a %d-day lead time, order %d units now — enough to cover ~%d days of forecast demand plus a safety buffer.',
                     $model,
                     $perWeek,
                     $projectedStockoutDate,
                     $leadTimeDays,
                     $suggestedReorderQty,
+                    $leadTimeDays + $config->coveragePeriodDays,
                 )
                 : sprintf(
-                    'Forecast (%s): ~%d/week expected with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout.',
+                    'Forecast (%s): ~%d/week expected with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout — enough to cover ~%d days of forecast demand plus a safety buffer.',
                     $model,
                     $perWeek,
                     $days,
                     $leadTimeDays,
                     $suggestedReorderQty,
+                    $leadTimeDays + $config->coveragePeriodDays,
                 ),
             'dead_stock' => sprintf(
                 'Forecast (%s): demand has effectively stopped — about $%s could be freed by clearing the remaining stock.',
@@ -311,8 +313,9 @@ final class ReorderCalculator
     }
 
     /**
-     * The original window-average wording — kept byte-identical so the
-     * fallback path (no forecast) reads exactly as before.
+     * The window-average wording for the fallback path (no forecast). The
+     * fallback *maths* stay byte-identical to the original formula; the
+     * wording explains the suggested quantity the same way model mode does.
      *
      * @param  'reorder'|'dead_stock'|'overstock'|'healthy'  $type
      */
@@ -336,12 +339,15 @@ final class ReorderCalculator
         $days = (int) round($daysOfStockLeft);
 
         return match ($type) {
+            // Fallback qty = velocity × (lead + coverage), no safety buffer —
+            // so the wording claims only the rate-based cover.
             'reorder' => sprintf(
-                'Selling ~%d/week with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout.',
+                'Selling ~%d/week with ~%d days left. With a %d-day lead time, order %d units now to avoid a stockout — enough to cover ~%d days at the current rate.',
                 $perWeek,
                 $days,
                 $leadTimeDays,
                 $suggestedReorderQty,
+                $leadTimeDays + $config->coveragePeriodDays,
             ),
             'overstock' => sprintf(
                 '~%d days of stock at current sales. About $%s is tied up in excess inventory — consider a promotion.',

@@ -73,6 +73,8 @@ class ReorderCalculatorForecastTest extends TestCase
         // ceil(leadPlusCoverage 84 + safety (p90 48 - mean 28) 20) = 104
         $this->assertSame(104, $m->suggestedReorderQty);
         $this->assertStringContainsString('Forecast (AutoETS)', $m->reasoning);
+        // The qty must explain itself: sized for lead (7) + coverage (14) days.
+        $this->assertStringContainsString('enough to cover ~21 days of forecast demand plus a safety buffer', $m->reasoning);
     }
 
     public function test_null_p90_falls_back_to_safety_buffer_days_for_the_qty(): void
