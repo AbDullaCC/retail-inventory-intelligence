@@ -55,6 +55,31 @@ const activeRings = {
   danger: 'border-danger-500 ring-1 ring-danger-500',
 }
 
+/** Soft tone wash for `tinted` cards — deliberately quiet next to bg-white. */
+const tintedBg = {
+  default: 'bg-slate-50/60',
+  brand: 'bg-brand-50/60',
+  success: 'bg-success-50/60',
+  warning: 'bg-warning-50/60',
+  danger: 'bg-danger-50/60',
+}
+
+const tintedBorder = {
+  default: 'border-slate-200/70',
+  brand: 'border-brand-100',
+  success: 'border-success-100',
+  warning: 'border-warning-100',
+  danger: 'border-danger-100',
+}
+
+const iconChips = {
+  default: 'bg-slate-100 text-slate-500',
+  brand: 'bg-brand-100 text-brand-600',
+  success: 'bg-success-100 text-success-600',
+  warning: 'bg-warning-100 text-warning-600',
+  danger: 'bg-danger-100 text-danger-600',
+}
+
 interface StatCardProps {
   label: string
   value: string
@@ -69,9 +94,11 @@ interface StatCardProps {
   onClick?: () => void
   /** Highlights the card with a tone-coloured ring while its filter is applied. */
   active?: boolean
+  /** Soft tone-washed surface with the icon in a chip (verdict KPIs). */
+  tinted?: boolean
 }
 
-export function StatCard({ label, value, icon, tone = 'default', delta, deltaLabel, sparkline, hint, onClick, active }: StatCardProps) {
+export function StatCard({ label, value, icon, tone = 'default', delta, deltaLabel, sparkline, hint, onClick, active, tinted }: StatCardProps) {
   const showDelta = delta !== undefined && delta !== null && Number.isFinite(delta)
   const Wrapper = onClick ? 'button' : 'div'
 
@@ -79,14 +106,20 @@ export function StatCard({ label, value, icon, tone = 'default', delta, deltaLab
     <Wrapper
       {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': active } : {})}
       className={cn(
-        'rounded-xl border border-slate-200/70 bg-white p-5 text-left shadow-card',
+        'rounded-xl border p-5 text-left shadow-card',
+        tinted ? tintedBg[tone] : 'bg-white',
+        // Exactly one border class — cn() does not resolve Tailwind conflicts.
+        active ? activeRings[tone] : tinted ? tintedBorder[tone] : 'border-slate-200/70',
         onClick && 'cursor-pointer transition-shadow hover:shadow-pop',
-        active && activeRings[tone],
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-        {icon && <span className={cn('shrink-0', statTones[tone])}>{icon}</span>}
+        {icon && (
+          <span className={cn('shrink-0', tinted ? cn('rounded-lg p-2', iconChips[tone]) : statTones[tone])}>
+            {icon}
+          </span>
+        )}
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div>

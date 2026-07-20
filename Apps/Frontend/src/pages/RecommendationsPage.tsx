@@ -84,6 +84,66 @@ const rowTint: Record<RecommendationType, string> = {
   healthy: 'border-l-success-600',
 }
 
+const shelfTones: Record<RecommendationType, string> = {
+  reorder: 'bg-danger-600',
+  overstock: 'bg-warning-600',
+  dead_stock: 'bg-slate-400',
+  healthy: 'bg-success-600',
+}
+
+/**
+ * The shelf — the whole catalogue as one proportional strip, one sliver per
+ * product, in the verdict colours. Segments toggle the same filters as the
+ * KPI cards; the strip shows what the counts can't: proportion.
+ */
+function ShelfStrip({
+  summary,
+  filter,
+  onToggle,
+}: {
+  summary: RecommendationsSummary
+  filter: Filter
+  onToggle: (type: RecommendationType) => void
+}) {
+  const total = summary.recommendations.length
+  if (total === 0) return null
+
+  const segments: Array<{ type: RecommendationType; count: number }> = [
+    { type: 'reorder', count: summary.reorder_count },
+    { type: 'overstock', count: summary.overstock_count },
+    { type: 'dead_stock', count: summary.dead_stock_count },
+    { type: 'healthy', count: summary.healthy_count },
+  ]
+
+  return (
+    <div className="flex h-2.5 origin-left gap-0.5 overflow-hidden rounded-full motion-safe:animate-shelf-in">
+      {segments
+        .filter((segment) => segment.count > 0)
+        .map((segment) => {
+          const { label } = recommendationPresentation(segment.type)
+          const pct = Math.round((segment.count / total) * 100)
+          return (
+            <button
+              key={segment.type}
+              type="button"
+              // flex-grow by count keeps the widths honestly proportional.
+              style={{ flexGrow: segment.count }}
+              title={`${label}: ${formatNumber(segment.count)} products (${pct}%) — click to focus`}
+              aria-label={`${label}: ${formatNumber(segment.count)} products, ${pct}% of catalogue`}
+              aria-pressed={filter === segment.type}
+              onClick={() => onToggle(segment.type)}
+              className={cn(
+                'h-full min-w-1.5 basis-0 transition-opacity',
+                shelfTones[segment.type],
+                filter !== 'all' && filter !== segment.type && 'opacity-30 hover:opacity-70',
+              )}
+            />
+          )
+        })}
+    </div>
+  )
+}
+
 type SortKey = 'trend' | 'stock' | 'velocity' | 'cover' | 'order' | 'cash'
 
 function sortValue(rec: Recommendation, key: SortKey): number | null {
@@ -375,6 +435,18 @@ export function RecommendationsPage() {
 
   const dirFor = (key: SortKey): SortDir | null => (sort?.key === key ? sort.dir : null)
 
+  // The header opens with the situation, not a mission statement.
+  const lockedCash = overstockCash + summary.dead_stock_cash_recoverable
+  const laterCount = summary.reorder_count - urgent.length
+  const headline = [
+    urgent.length > 0
+      ? `${formatNumber(urgent.length)} to order today${laterCount > 0 ? `, ${formatNumber(laterCount)} more this week` : ''}`
+      : summary.reorder_count > 0
+        ? `${formatNumber(summary.reorder_count)} products to order this week`
+        : 'Nothing needs ordering right now',
+    ...(lockedCash > 0 ? [`${formatCurrency(lockedCash)} locked in overstock and dead stock`] : []),
+  ].join(' — ')
+
   // One persistent insight slot between the KPIs and the table: the content
   // follows the selected verdict, but the card itself never appears or
   // disappears — no layout jump when a KPI filter is clicked.
@@ -446,7 +518,7 @@ export function RecommendationsPage() {
         title="Recommendations"
         description={
           <span className="inline-flex flex-wrap items-center gap-1.5">
-            What to order, what to trim, and where cash is stuck ·{' '}
+            {headline} ·{' '}
             {formatNumber(summary.forecasted_count)} of {formatNumber(total)} products forecasted
             <Tooltip
               content={`Lead time defaults to ${summary.default_lead_time_days} days. Products without a fresh forecast fall back to the ${summary.velocity_window_days}-day average.`}
@@ -483,12 +555,15 @@ export function RecommendationsPage() {
           </Card>
         )}
 
+        <ShelfStrip summary={summary} filter={filter} onToggle={toggleFilter} />
+
         {/* KPI cards double as filters — click to focus the list, click again for all. */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Need reorder"
             value={formatNumber(summary.reorder_count)}
             tone="danger"
+            tinted
             icon={<PackagePlus className="h-5 w-5" />}
             hint={urgent.length > 0 ? `${formatNumber(urgent.length)} to order today` : 'none urgent'}
             onClick={() => toggleFilter('reorder')}
@@ -498,6 +573,7 @@ export function RecommendationsPage() {
             label="Overstocked"
             value={formatNumber(summary.overstock_count)}
             tone="warning"
+            tinted
             icon={<AlertTriangle className="h-5 w-5" />}
             hint={`${formatCurrency(overstockCash)} tied up`}
             onClick={() => toggleFilter('overstock')}
@@ -506,6 +582,7 @@ export function RecommendationsPage() {
           <StatCard
             label="Dead stock"
             value={formatNumber(summary.dead_stock_count)}
+            tinted
             icon={<Archive className="h-5 w-5" />}
             hint={`${formatCurrency(summary.dead_stock_cash_recoverable)} recoverable`}
             onClick={() => toggleFilter('dead_stock')}
@@ -515,6 +592,7 @@ export function RecommendationsPage() {
             label="Healthy"
             value={formatNumber(summary.healthy_count)}
             tone="success"
+            tinted
             icon={<CheckCircle2 className="h-5 w-5" />}
             hint="no action needed"
             onClick={() => toggleFilter('healthy')}
@@ -524,7 +602,7 @@ export function RecommendationsPage() {
 
         {urgent.length > 0 && (
           <Card className="border-l-4 border-l-danger-600">
-            <div className="px-5 py-4">
+            <div className="rounded-xl bg-gradient-to-r from-danger-50/80 to-transparent px-5 py-4">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="inline-flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-danger-600" />
@@ -595,7 +673,7 @@ export function RecommendationsPage() {
             ) : undefined
           }
         >
-          <div className="p-4">
+          <div key={filter} className="p-4 motion-safe:animate-panel-in">
             <Suspense fallback={<ChartSkeleton height={260} />}>{insight.chart}</Suspense>
           </div>
         </Card>
@@ -681,7 +759,9 @@ export function RecommendationsPage() {
                     >
                       {showVerdict && (
                         <TD>
-                          <Badge tone={present.tone}>{present.label}</Badge>
+                          <Badge tone={present.tone} dot>
+                            {present.label}
+                          </Badge>
                         </TD>
                       )}
                       <TD>

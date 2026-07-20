@@ -49,6 +49,23 @@
   --radius-lg: 0.625rem;
   --radius-xl: 0.875rem;
   --radius-2xl: 1.125rem;
+
+  --animate-shelf-in: shelf-in 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-panel-in: panel-in 0.25s ease-out;
+}
+
+/* One-time reveals; only applied under motion-safe. */
+@keyframes shelf-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 :root {
