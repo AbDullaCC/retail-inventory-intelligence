@@ -148,11 +148,20 @@ export function DashboardPage() {
   const sparkline = toSparkline(series)
   const hasForecast = forecast !== null && forecast.forecasted_count > 0
 
+  // Date plus the one thing that matters right now, not just the date.
+  const situation = summary
+    ? summary.urgent_count > 0
+      ? `${formatNumber(summary.urgent_count)} products need ordering now`
+      : summary.reorder_count > 0
+        ? `${formatNumber(summary.reorder_count)} products to order this week`
+        : 'nothing needs ordering'
+    : null
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Dashboard"
-        description={`Today is ${today}`}
+        description={situation ? `Today is ${today} · ${situation}` : `Today is ${today}`}
         actions={<SegmentedControl options={TREND_OPTIONS} value={days} onChange={setDays} />}
       />
 
@@ -189,6 +198,7 @@ export function DashboardPage() {
               label="Needs reorder"
               value={formatNumber(summary.reorder_count)}
               tone="warning"
+              tinted
               icon={<AlertTriangle className="h-4 w-4" />}
               hint={
                 summary.urgent_count > 0
@@ -201,6 +211,7 @@ export function DashboardPage() {
               label="Out of stock"
               value={formatNumber(summary.out_of_stock_count)}
               tone="danger"
+              tinted
               icon={<PackageX className="h-4 w-4" />}
             />
           </div>
@@ -265,7 +276,7 @@ export function DashboardPage() {
                           >
                             {rec.name}
                           </Link>
-                          <span className="shrink-0 font-mono text-xs text-slate-400">{rec.sku}</span>
+                          <span className="shrink-0 font-mono text-xs text-slate-500">{rec.sku}</span>
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
                           <span className="text-sm text-slate-600 tabular-nums">
@@ -309,7 +320,7 @@ export function DashboardPage() {
                           </Link>
                         </div>
                         {movement.reason && (
-                          <p className="mt-0.5 truncate text-xs text-slate-400">{movement.reason}</p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">{movement.reason}</p>
                         )}
                       </div>
                       <div className="shrink-0 text-right">
@@ -322,7 +333,7 @@ export function DashboardPage() {
                           {movement.change >= 0 ? '+' : ''}
                           {formatNumber(movement.change)}
                         </p>
-                        <p className="text-xs text-slate-400">{formatDateTime(movement.created_at)}</p>
+                        <p className="text-xs text-slate-500">{formatDateTime(movement.created_at)}</p>
                       </div>
                     </li>
                   ))}
