@@ -52,6 +52,22 @@ final class AnswerChecker
         return false;
     }
 
+    /**
+     * {@see hasNumber} for whole-number counts — additionally accepts a zero
+     * stated in words ("none", "no products"), which models prefer over a
+     * literal 0 in prose.
+     */
+    public static function hasCount(string $answer, int $expected): bool
+    {
+        if (self::hasNumber($answer, (float) $expected, 0.0, 0.4)) {
+            return true;
+        }
+
+        return $expected === 0 && self::hasAnyText($answer, [
+            'none', 'no products', 'no items', 'zero', 'not any', "aren't any", 'nothing is',
+        ]);
+    }
+
     public static function hasText(string $answer, string $needle): bool
     {
         return str_contains(mb_strtolower($answer), mb_strtolower($needle));

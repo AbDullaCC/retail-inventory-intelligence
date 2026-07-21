@@ -39,6 +39,19 @@ final class AnswerCheckerTest extends TestCase
         $this->assertFalse(AnswerChecker::hasNumber('60 products need reordering', 59.0, 0.0, 0.4));
     }
 
+    public function test_count_matching_accepts_a_zero_stated_in_words(): void
+    {
+        // Models answer a zero count as prose with no digits at all.
+        $this->assertTrue(AnswerChecker::hasCount('There are currently no products completely out of stock.', 0));
+        $this->assertTrue(AnswerChecker::hasCount('None of your products are out of stock.', 0));
+        $this->assertTrue(AnswerChecker::hasCount('0 products are out of stock.', 0));
+        $this->assertFalse(AnswerChecker::hasCount('Three products are out of stock.', 0));
+
+        // Wordy relief applies ONLY to zero — a nonzero count still needs the number.
+        $this->assertTrue(AnswerChecker::hasCount('62 products need reordering.', 62));
+        $this->assertFalse(AnswerChecker::hasCount('No products need reordering.', 62));
+    }
+
     public function test_text_matching_is_case_insensitive(): void
     {
         $answer = 'The most urgent item is the **Alarm Clock Bakelike Red**.';

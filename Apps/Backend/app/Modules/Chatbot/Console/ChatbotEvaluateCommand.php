@@ -6,6 +6,7 @@ namespace App\Modules\Chatbot\Console;
 
 use App\Modules\Chatbot\Exceptions\ChatUnavailableException;
 use App\Modules\Chatbot\Services\ChatOrchestrator;
+use App\Modules\Chatbot\Services\ChatResult;
 use App\Modules\Chatbot\Support\AnswerChecker;
 use App\Modules\Dashboard\Services\Contracts\DashboardServiceInterface;
 use App\Modules\Forecast\Services\Contracts\ForecastReaderInterface;
@@ -33,6 +34,13 @@ final class ChatbotEvaluateCommand extends Command
         {--list : List the golden questions without calling the LLM}';
 
     protected $description = 'Score the AI assistant against golden questions with database-computed expected answers.';
+
+    /**
+     * Seconds between live questions. The Gemini free tier allows 15
+     * requests/minute and each question costs ~2 (tool round + answer), so
+     * anything under ~8 s/question trips 429s mid-run.
+     */
+    private const PACE_SECONDS = 8;
 
     private ?RecommendationsSummaryDTO $summary = null;
 
@@ -86,8 +94,13 @@ final class ChatbotEvaluateCommand extends Command
             // concrete product name resolved from the live data).
             $question = $expectation['question'] ?? $golden['question'];
 
+            // Stay under the free tier's requests-per-minute cap.
+            if ($passed + $failed > 0 && ! app()->runningUnitTests()) {
+                sleep(self::PACE_SECONDS);
+            }
+
             try {
-                $result = $orchestrator->run([], $question);
+                $result = $this->askAssistant($orchestrator, $question);
             } catch (ChatUnavailableException $e) {
                 $this->error('LLM unavailable: '.$e->getMessage());
 
@@ -122,6 +135,27 @@ final class ChatbotEvaluateCommand extends Command
     }
 
     /**
+     * One question through the live orchestrator, with a single retry when
+     * the provider rate-limits (free tier: 15 requests/minute) — a mid-run
+     * 429 should stall the run, not abort it.
+     */
+    private function askAssistant(ChatOrchestrator $orchestrator, string $question): ChatResult
+    {
+        try {
+            return $orchestrator->run([], $question);
+        } catch (ChatUnavailableException $e) {
+            if (! str_contains($e->getMessage(), '429') || app()->runningUnitTests()) {
+                throw $e;
+            }
+
+            $this->components->warn('Rate-limited (429) — waiting 30s and retrying once…');
+            sleep(30);
+
+            return $orchestrator->run([], $question);
+        }
+    }
+
+    /**
      * The golden set. Each entry: a question, and an `expect` closure that
      * computes ground truth at runtime and returns a checker — or null to skip
      * (with `skip_reason`). Expectations use the SAME services the chatbot
@@ -153,7 +187,7 @@ final class ChatbotEvaluateCommand extends Command
 
                     return [
                         'expected' => "exactly {$count}",
-                        'check' => fn (string $a): bool => AnswerChecker::hasNumber($a, (float) $count, 0.0, 0.4),
+                        'check' => fn (string $a): bool => AnswerChecker::hasCount($a, (int) $count),
                     ];
                 },
             ],
@@ -165,7 +199,8 @@ final class ChatbotEvaluateCommand extends Command
 
                     return [
                         'expected' => "exactly {$count}",
-                        'check' => fn (string $a): bool => AnswerChecker::hasNumber($a, (float) $count, 0.0, 0.4),
+                        // hasCount: a zero answered as "none" must pass too.
+                        'check' => fn (string $a): bool => AnswerChecker::hasCount($a, $count),
                     ];
                 },
             ],
