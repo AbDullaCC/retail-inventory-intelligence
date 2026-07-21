@@ -1,5 +1,8 @@
 # Judge Q&A — pitch bullet points
 
+> Full judge-simulation version (every question + rehearsed answer, ordered by
+> the five pitch sections, incl. GDPR): `Pitch-Defense-QA.md`.
+
 > Numbers below verified on 11/7/2026. The demo data shifts daily — the morning
 > of the pitch run `php artisan chatbot:evaluate` (the golden-question scorecard:
 > asks the live assistant ~12 judge questions and checks every answer against the
