@@ -170,6 +170,47 @@ final class ChatbotEvaluateCommand extends Command
                 },
             ],
             [
+                'key' => 'quiet-days',
+                'question' => 'On what dates in the past 2 months did I have zero stock movements?',
+                'expect' => function (): array {
+                    $series = app(DashboardServiceInterface::class)->trends(60)->toArray()['series'];
+                    $dates = array_values(array_map(
+                        static fn (array $d): string => $d['date'],
+                        array_filter($series, static fn (array $d): bool => $d['movements'] === 0),
+                    ));
+
+                    if ($dates === []) {
+                        return [
+                            'expected' => 'states that every day in the window had activity',
+                            'check' => static fn (string $a): bool => AnswerChecker::hasAnyText(
+                                $a,
+                                ['no dates', 'no days', 'none', 'every day', 'each day', 'all days', 'no zero', "weren't any", 'were not any'],
+                            ),
+                        ];
+                    }
+
+                    $count = count($dates);
+
+                    return [
+                        'expected' => sprintf('%d dates, e.g. %s', $count, $dates[0]),
+                        // Right count, or at least three of the dates named
+                        // (ISO or "July 5" prose form both accepted).
+                        'check' => static function (string $a) use ($count, $dates): bool {
+                            if (AnswerChecker::hasNumber($a, (float) $count, 0.0, 0.4)) {
+                                return true;
+                            }
+
+                            $named = array_filter($dates, static fn (string $d): bool => AnswerChecker::hasAnyText($a, [
+                                $d,
+                                (new DateTimeImmutable($d))->format('F j'),
+                            ]));
+
+                            return count($named) >= min(3, $count);
+                        },
+                    ];
+                },
+            ],
+            [
                 'key' => 'overstock-cash',
                 'question' => 'Exactly how much cash is tied up in overstocked products?',
                 'expect' => function (): array {
