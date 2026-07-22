@@ -246,6 +246,40 @@ final class ChatbotEvaluateCommand extends Command
                 },
             ],
             [
+                'key' => 'projected-revenue-today',
+                'question' => 'How much revenue do we expect to get today?',
+                'expect' => function (): ?array {
+                    $projection = app(ForecastReaderInterface::class)->projection(1, now()->toDateTimeImmutable());
+                    if ($projection->forecastedCount === 0) {
+                        return null;
+                    }
+                    $revenue = round($projection->projectedRevenue, 2);
+
+                    return [
+                        'expected' => '$'.number_format($revenue, 2).' (±2%)',
+                        'check' => fn (string $a): bool => AnswerChecker::hasNumber($a, $revenue, 2.0, 1.0),
+                    ];
+                },
+                'skip_reason' => 'no fresh forecasts',
+            ],
+            [
+                'key' => 'projected-units-5d',
+                'question' => 'How many units do we expect to sell in the next 5 days?',
+                'expect' => function (): ?array {
+                    $projection = app(ForecastReaderInterface::class)->projection(5, now()->toDateTimeImmutable());
+                    if ($projection->forecastedCount === 0) {
+                        return null;
+                    }
+                    $units = (int) round($projection->projectedUnits);
+
+                    return [
+                        'expected' => number_format($units).' units (±2%)',
+                        'check' => fn (string $a): bool => AnswerChecker::hasNumber($a, (float) $units, 2.0, 1.0),
+                    ];
+                },
+                'skip_reason' => 'no fresh forecasts',
+            ],
+            [
                 'key' => 'overstock-cash',
                 'question' => 'Exactly how much cash is tied up in overstocked products?',
                 'expect' => function (): array {

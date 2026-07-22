@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Forecast\Services;
 
+use App\Modules\Forecast\DTOs\ForecastProjectionDTO;
 use App\Modules\Forecast\DTOs\ForecastSnapshot;
 use App\Modules\Forecast\DTOs\ForecastSummaryDTO;
 use App\Modules\Forecast\DTOs\ProductForecastDTO;
@@ -77,6 +78,78 @@ final class ForecastReader implements ForecastReaderInterface
                 array_keys($daily),
             ),
         );
+    }
+
+    public function projection(int $days, DateTimeImmutable $now, ?int $productId = null): ForecastProjectionDTO
+    {
+        $days = max(1, min(30, $days));
+
+        $query = $this->freshQuery($now)->with('product');
+        if ($productId !== null) {
+            $query->where('product_id', $productId);
+        }
+        $forecasts = $query->get();
+
+        $units = 0.0;
+        $revenue = 0.0;
+        $stockouts = 0;
+        $perProduct = [];
+
+        foreach ($forecasts as $forecast) {
+            $means = array_map(static fn (array $point): float => (float) $point['mean'], $forecast->daily_forecast);
+
+            // Window demand off the actual curve, padded at the flat average
+            // beyond the stored horizon — same convention as summary().
+            $windowUnits = (float) array_sum(array_slice($means, 0, $days))
+                + max(0, $days - count($means)) * $forecast->expected_daily_demand;
+
+            $price = (float) ($forecast->product->price ?? 0);
+            $units += $windowUnits;
+            $revenue += $windowUnits * $price;
+
+            if ($this->stocksOutWithin($days, $means, $forecast->expected_daily_demand, (int) ($forecast->product->quantity ?? 0))) {
+                $stockouts++;
+            }
+
+            $perProduct[] = [
+                'product_id' => (int) $forecast->product_id,
+                'name' => (string) ($forecast->product->name ?? ('#'.$forecast->product_id)),
+                'units' => $windowUnits,
+                'revenue' => $windowUnits * $price,
+            ];
+        }
+
+        usort($perProduct, static fn (array $a, array $b): int => $b['revenue'] <=> $a['revenue']);
+
+        return new ForecastProjectionDTO(
+            days: $days,
+            fromDate: $now->format('Y-m-d'),
+            toDate: $now->modify('+'.($days - 1).' days')->format('Y-m-d'),
+            forecastedCount: $forecasts->count(),
+            projectedUnits: $units,
+            projectedRevenue: $revenue,
+            projectedStockouts: $stockouts,
+            topProducts: array_slice($perProduct, 0, 5),
+        );
+    }
+
+    /**
+     * Does cumulative expected demand reach the on-hand stock inside the
+     * window? Zero-demand products never count, even at zero stock.
+     *
+     * @param  list<float>  $means
+     */
+    private function stocksOutWithin(int $days, array $means, float $flatDaily, int $stock): bool
+    {
+        $cumulative = 0.0;
+        for ($i = 0; $i < $days; $i++) {
+            $cumulative += $means[$i] ?? $flatDaily;
+            if ($cumulative > 0.0 && $cumulative >= $stock) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function latestSnapshots(DateTimeImmutable $now): array

@@ -13,6 +13,7 @@ use App\Modules\Chatbot\Services\Llm\GeminiClient;
 use App\Modules\Chatbot\Services\Tools\FindProductTool;
 use App\Modules\Chatbot\Services\Tools\GetProductForecastTool;
 use App\Modules\Chatbot\Services\Tools\GetProductRecommendationTool;
+use App\Modules\Chatbot\Services\Tools\GetProjectedDemandTool;
 use App\Modules\Chatbot\Services\Tools\GetRecentMovementsTool;
 use App\Modules\Chatbot\Services\Tools\GetRecommendationsTool;
 use App\Modules\Chatbot\Services\Tools\GetSalesTrendsTool;
@@ -49,6 +50,7 @@ final class ChatbotServiceProvider extends ModuleServiceProvider
                 $this->app->make(FindProductTool::class)->build(),
                 $this->app->make(GetProductRecommendationTool::class)->build(),
                 $this->app->make(GetProductForecastTool::class)->build(),
+                $this->app->make(GetProjectedDemandTool::class)->build(),
                 $this->app->make(GetTopProductsTool::class)->build(),
                 $this->app->make(GetSalesTrendsTool::class)->build(),
                 $this->app->make(GetRecentMovementsTool::class, ['defaultLimit' => $cap])->build(),

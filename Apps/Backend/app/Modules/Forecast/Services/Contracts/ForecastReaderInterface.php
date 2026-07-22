@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Forecast\Services\Contracts;
 
+use App\Modules\Forecast\DTOs\ForecastProjectionDTO;
 use App\Modules\Forecast\DTOs\ForecastSnapshot;
 use App\Modules\Forecast\DTOs\ForecastSummaryDTO;
 use App\Modules\Forecast\DTOs\ProductForecastDTO;
@@ -16,6 +17,14 @@ interface ForecastReaderInterface
      * projected units/revenue, model mix).
      */
     public function summary(DateTimeImmutable $now): ForecastSummaryDTO;
+
+    /**
+     * Demand projection over the next $days (clamped to 1–30; day 1 = today),
+     * store-wide or for one product: units, revenue, top revenue drivers, and
+     * products projected to stock out inside the window. Curves are padded at
+     * the flat average beyond the stored horizon, matching summary().
+     */
+    public function projection(int $days, DateTimeImmutable $now, ?int $productId = null): ForecastProjectionDTO;
 
     /**
      * Fresh (non-stale) snapshots for every forecasted product, keyed by
